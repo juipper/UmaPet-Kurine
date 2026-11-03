@@ -1,0 +1,65 @@
+{
+  "name": "umapet",
+  "productName": "赛马娘桌宠",
+  "version": "2.2.0",
+  "description": "赛马娘桌宠 · 伪3D贴图版（Electron + three.js）",
+  "main": "src/main/main.js",
+  "author": "juipper",
+  "license": "MIT",
+  "scripts": {
+    "build:renderer": "esbuild src/renderer/js/app.js --bundle --format=iife --outfile=src/renderer/bundle.js --log-level=warning",
+    "start": "electron .",
+    "dev": "npm run build:renderer && electron .",
+    "dist": "npm run build:renderer && electron-builder --win portable",
+    "pack:dir": "npm run build:renderer && electron-builder --win dir"
+  },
+  "devDependencies": {
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
+    "three": "^0.187.0"
+  },
+  "build": {
+    "appId": "com.juipper.umapet",
+    "productName": "赛马娘桌宠",
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "assets/icon.ico",
+      "assets/icon.png",
+      "assets/sprites/deg_000.png",
+      "assets/sprites/deg_020.png",
+      "assets/sprites/deg_045.png",
+      "assets/sprites/deg_090.png",
+      "assets/sprites/deg_135.png",
+      "assets/sprites/deg_180.png",
+      "assets/sprites/deg_225.png",
+      "assets/sprites/deg_270.png",
+      "assets/sprites/deg_315.png",
+      "package.json",
+      "!electron_runtime/**",
+      "!release/**",
+      "!tools/shots/**",
+      "!build_out.log",
+      "!electron_dl.log",
+      "!npm_ci.log",
+      "!npm_inst.log",
+      "!build_run.bat",
+      "!temp_electron.zip"
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "UmaPet-Portable-${version}.exe"
+    },
+    "electronDist": "electron_runtime"
+  }
+}

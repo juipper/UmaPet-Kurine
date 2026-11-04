@@ -37,19 +37,6 @@ desktop.ini
 *_2.js
 *_20*.js
 
-# 贴图草稿（仅保留 9 向正式贴图）
-/assets/sprites/deg_0.png
-/assets/sprites/deg_0m.png
-/assets/sprites/deg_60.png
-/assets/sprites/deg_120.png
-/assets/sprites/deg_135_new.png
-/assets/sprites/deg_225_new.png
-/assets/sprites/deg_240.png
-/assets/sprites/deg_300.png
-
-# 旧 3D 版草稿
-/src/renderer/js/app_v2.js
-
 # legacy Python 版构建产物
 /legacy/build/
 /legacy/dist/

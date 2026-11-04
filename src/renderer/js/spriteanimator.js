@@ -1,23 +1,19 @@
 import * as THREE from 'three';
 
 /**
- * 伪 3D 贴图动画器（v2）。
+ * 贴图动画器（正面单视角版）。
  *
- * 与 3D 版 Animator 保持完全一致的对外接口（play / setMood / setLook / setDragging /
- * setDragVelocity / react / update / look / walkX / isBusy），behavior.js、ui、托盘逻辑
- * 无需任何改动。
+ * 对外接口与旧版保持一致（play / setMood / setLook / setDragging / setDragVelocity /
+ * react / update / look / walkX / isBusy），behavior.js、ui 与托盘逻辑无需改动。
  *
- * v2 相对 v1 的三处结构性改动：
- *  1. 转身不再用「双平面交叉淡入」（两张贴图同时半透明叠加 = 明显双影），改为滑动擦除
- *     + 横向收缩；静止时自动吸附到整帧，彻底消除残影与接缝。
- *  2. 眨眼不再用固定的正面闭眼块，而是逐朝向闭眼贴片，与身体共用同一套擦除遮罩，
- *     侧身 90° 用侧脸闭眼、背面 135/180/225 不出现眼睛。
- *  3. 动作全部改为「目标姿势 + 弹簧阻尼」驱动，并加入预备动作（anticipation）、
- *     跟随迟滞（follow-through）与落地缓冲（settle），消除数学正弦式的僵硬感；
- *     伸懒腰 / 打哈欠 / 歪头 / 欢呼等动作用关键帧时间轴编排。
+ * 相对上一版的改动：
+ *  1. 取消转身：删除 yaw / yawVel / 锁定朝向 / 擦除进度 / 横向透视旋转等整套朝向逻辑，
+ *     角色始终正面朝向用户，动作只通过「升降 + 侧倾 + 俯仰 + 缩放」表达。
+ *  2. 点击反馈收敛：弹簧冲量（kick）全部按「峰值角度 ≤ 约 7°、回弹一次即稳定」重新标定，
+ *     不再出现被拍一下整个人大幅甩出去、晃好几下的飘忽感。
+ *  3. 动作仍由「目标姿势 + 弹簧阻尼」驱动，并保留预备动作、跟随迟滞与落地缓冲，
+ *     伸懒腰 / 打哈欠 / 歪头 / 欢呼用关键帧时间轴编排。
  */
-
-const D2R = Math.PI / 180;
 
 function clamp(v, min, max) {
   return Math.min(max, Math.max(min, v));
@@ -83,8 +79,7 @@ function sampleKeys(keys, u) {
  *  - sy    纵向缩放（>1 伸展、<1 压缩；超过 1.13 会被读成"图像被拉长"）
  *  - lx    前后倾（rotation.x，负值=后仰弓背）
  *  - lz    左右倾（rotation.z）
- * 每个动作都遵守「蓄力(anticipation) → 主体(main) → 保持区间(hold) → 回落缓冲(settle)」，
- * 峰值处留一段 hold，真人做动作时顶点本来就会停顿几十毫秒，同时让截图/肉眼都抓得住。
+ * 每个动作都遵守「蓄力(anticipation) → 主体(main) → 保持区间(hold) → 回落缓冲(settle)」。
  */
 
 /** 伸懒腰：微蹲蓄力 → 舒展后仰（抬肩拔起）→ 顶点微颤保持 → 回落缓冲。 */
@@ -135,17 +130,39 @@ const CHEER_KEYS = [
   { t: 1.0, bob: 0, sy: 1, lz: 0, lx: 0 }
 ];
 
+/**
+ * 点击反馈冲量表（bob / leanZ / leanX 为弹簧速度冲量，scaleY 为缩放冲量）。
+ *
+ * 标定依据（弹簧 k/c：bob 210/26、lean 105/16、scaleY 165/21）：
+ * 旧版 leanZ 冲量高达 42（峰值约 70°）且 yawVel 冲量 ±74，
+ * 正是"被拍一下就整个人甩出去、还晃半天"的根源。现按实测标定重写：
+ *   leanZ 峰值 ≈ kick × 1.65°、bob 峰值 ≈ kick × 0.017、scaleY 峰值 ≈ kick × 0.011，
+ * 取 leanZ 冲量 0.8~2.6（峰值约 1.3°~4.3°），一次受力只过冲一次、0.3~0.6s 收敛。
+ */
+const REACT = {
+  ear: { bob: -0.9, leanZ: 2.6, leanX: 0, scaleY: 0.6 },
+  hat: { bob: -0.8, leanZ: -2.2, leanX: 0, scaleY: 0.5 },
+  hair: { bob: -0.7, leanZ: 2.2, leanX: 0, scaleY: 0.5 },
+  face: { bob: 0.8, leanZ: 1.9, leanX: 0, scaleY: 1.2 },
+  torso: { bob: 0.9, leanZ: 1.3, leanX: 0, scaleY: 1.3 },
+  skirt: { bob: 0.4, leanZ: 2.2, leanX: -1.2, scaleY: 0.5 },
+  tail: { bob: -0.5, leanZ: -1.8, leanX: 0.4, scaleY: 0.4 },
+  leg: { bob: -1.0, leanZ: 2.0, leanX: 0, scaleY: 0.5 },
+  happy: { bob: 0.9, leanZ: 0, leanX: 0, scaleY: 1.0 },
+  body: { bob: 1.0, leanZ: 1.4, leanX: 0, scaleY: 1.2 }
+};
+
+/** 点击反馈的持续时间（秒），仅用于安抚表情与调试强度，与实际回弹无关（回弹由弹簧决定）。 */
+const REACT_TIME = 0.6;
+
 export class SpriteAnimator {
   constructor(character) {
     this.character = character;
     this.root = character.root;
     this.pivot = character.pivot;
-    this.primary = character.primary;
-    this.secondary = character.secondary;
-    this.textures = character.textures;
-    this.eyeTextures = character.eyeTextures || null;
-    this.setWipe = character.setWipe || (() => {});
-    this.degrees = character.DEGREES;
+    this.body = character.body;
+    this.eye = character.eye;
+    this.expression = character.expression || null;
 
     this.baseRootY = this.root.position.y;
     this.baseRootX = this.root.position.x;
@@ -177,17 +194,12 @@ export class SpriteAnimator {
     this.jumpVel = 0;
     this.jumpActive = false;
 
-    this.yaw = 0;
-    this.yawVel = 0;
-    this.fixedYaw = null; // 调试/截图用：锁定朝向
-    this.debugWipe = null; // 调试/截图用：强制擦除进度 0..1
     this.debugClose = null; // 调试/截图用：强制闭眼程度 0..1
+    this.freezePose = false; // 调试/截图用：锁定姿势，便于像素对比
     this.blinkTimer = 2 + Math.random() * 2;
     this.blinkPhase = 0;
     this.noBlink = false;
     this.blushVal = 0;
-    this.freezePose = false; // 调试/截图用：锁定姿势，便于像素对比
-    this.expression = character.expression || null;
     this.phase = Math.random() * 10;
 
     // 姿势弹簧：值 + 速度，欠阻尼以保证“过冲—回摆—稳定”的自然节奏
@@ -197,18 +209,9 @@ export class SpriteAnimator {
     this.sScaleY = new Spring(1, 165, 21);
 
     this.gait = 0;
-    this.anticipateCd = 0;
-    this.yawnEye = 0;
-
-    this._degA = -1;
-    this._degB = -1;
-    this._p = 0;
-    this._lastYaw = 0;
-
-    this.applyFacing(1 / 60);
   }
 
-  // ---------- 兼容 3D 版接口 ----------
+  // ---------- 对外接口 ----------
 
   isBusy() {
     return this.busy || this.activity !== 'idle';
@@ -241,11 +244,11 @@ export class SpriteAnimator {
 
   setExpression() {}
   setMouth() {}
+
   triggerHappy() {
-    this.reactTimer = Math.max(this.reactTimer, 0.5);
+    this.reactTimer = Math.max(this.reactTimer, REACT_TIME);
     this.reactPart = 'happy';
-    this.sBob.kick(0.9);
-    this.sScaleY.kick(0.9);
+    this.applyReact('happy');
   }
 
   setLook(x, y) {
@@ -267,112 +270,28 @@ export class SpriteAnimator {
 
   jump() {
     this.jumpActive = true;
-    this.jumpVel = 3.4;
-    this.sScaleY.kick(1.6); // 起跳前向上拉伸
+    this.jumpVel = 2.8;
+    this.sScaleY.kick(1.0); // 起跳前向上拉伸
   }
 
   /**
    * 点击反馈：给弹簧一个脉冲，由弹簧自然完成“受力—回弹—稳定”，
    * 而不是叠加一段正弦抖动（正弦叠加是最容易显得机械的做法）。
+   * 冲量见 REACT 表，幅度刻意压小：轻拍一下就够，不要整个人甩出去。
    */
   react(part) {
-    this.reactTimer = 0.7;
+    this.reactTimer = REACT_TIME;
     this.reactPart = part || 'body';
     this.reactStrength = 1;
-    switch (part) {
-      case 'ear':
-      case 'hair':
-        this.sBob.kick(-1.5);
-        this.sLeanZ.kick(42);
-        this.yawVel += 34;
-        break;
-      case 'hat':
-        this.sBob.kick(-1.2);
-        this.sLeanZ.kick(-36);
-        this.yawVel -= 26;
-        break;
-      case 'face':
-        this.yawVel += 62;
-        this.sScaleY.kick(1.1);
-        break;
-      case 'torso':
-        this.sBob.kick(0.8);
-        this.sScaleY.kick(1.5);
-        break;
-      case 'skirt':
-        this.sLeanX.kick(-2.4);
-        this.sLeanZ.kick(38);
-        this.sBob.kick(0.5);
-        break;
-      case 'tail':
-        this.yawVel -= 74;
-        this.sLeanZ.kick(-22);
-        break;
-      case 'leg':
-        this.sBob.kick(-1.6);
-        this.sLeanZ.kick(30);
-        break;
-      default:
-        this.sBob.kick(1.1);
-        this.sLeanZ.kick(16);
-        break;
-    }
+    this.applyReact(part || 'body');
   }
 
-  // ---------- 朝向贴图：滑动擦除 ----------
-
-  /** 按当前朝向选择相邻两帧，并把擦除进度推到该角度对应的位置。 */
-  applyFacing(dt) {
-    const degAbs = ((this.yaw % 360) + 360) % 360;
-    const list = this.degrees;
-    let a = list[0];
-    let b = list[1];
-    let t = 0;
-    for (let i = 0; i < list.length; i += 1) {
-      const cur = list[i];
-      const next = list[(i + 1) % list.length];
-      const span = (next - cur + 360) % 360;
-      const local = (degAbs - cur + 360) % 360;
-      if (local <= span) {
-        a = cur;
-        b = next;
-        t = span > 0 ? local / span : 0;
-        break;
-      }
-    }
-
-    if (a !== this._degA) {
-      this.primary.material.map = this.textures.get(a);
-      if (this.eyeTextures && this.expression && this.expression.eyes[0]) {
-        this.expression.eyes[0].material.map = this.eyeTextures.get(a);
-      }
-      this._degA = a;
-    }
-    if (b !== this._degB) {
-      this.secondary.material.map = this.textures.get(b);
-      if (this.eyeTextures && this.expression && this.expression.eyes[1]) {
-        this.expression.eyes[1].material.map = this.eyeTextures.get(b);
-      }
-      this._degB = b;
-    }
-
-    // 角速度大 → 保留完整擦除；几乎静止 → 吸附到最近整帧（避免静止时出现竖向接缝）
-    let p = t;
-    if (this.debugWipe === null || this.debugWipe === undefined) {
-      const spin = Math.abs(this.yawVel);
-      let moving = clamp((spin - 12) / 30, 0, 1);
-      moving = moving * moving * (3 - 2 * moving);
-      if (moving < 1) {
-        const snapped = t < 0.5 ? 0 : 1;
-        p = snapped + (t - snapped) * moving;
-      }
-    } else {
-      p = this.debugWipe;
-    }
-    this._p = damp(this._p, p, 34, dt);
-    // p 越大越靠 B 帧：擦除带由右向左扫，转身方向与贴图变化方向一致
-    this.setWipe(this._p);
-    this.turnSpin = Math.abs(this.yawVel);
+  applyReact(part) {
+    const k = REACT[part] || REACT.body;
+    if (k.bob) this.sBob.kick(k.bob);
+    if (k.leanZ) this.sLeanZ.kick(k.leanZ);
+    if (k.leanX) this.sLeanX.kick(k.leanX);
+    if (k.scaleY) this.sScaleY.kick(k.scaleY);
   }
 
   // ---------- 主更新 ----------
@@ -397,7 +316,7 @@ export class SpriteAnimator {
     }
     if (this.reactTimer > 0) {
       this.reactTimer = Math.max(0, this.reactTimer - dt);
-      this.reactStrength = this.reactTimer / 0.7;
+      this.reactStrength = this.reactTimer / REACT_TIME;
     }
 
     this.lookSmooth.x = damp(this.lookSmooth.x, this.look.x, 6, dt);
@@ -415,8 +334,8 @@ export class SpriteAnimator {
         this.jumpOffset = 0;
         this.jumpVel = 0;
         this.jumpActive = false;
-        this.sScaleY.kick(-1.9); // 落地缓冲
-        this.sBob.kick(-0.6);
+        this.sScaleY.kick(-1.2); // 落地缓冲
+        this.sBob.kick(-0.35);
       }
     }
 
@@ -424,12 +343,12 @@ export class SpriteAnimator {
     let targetLeanZ = pose.leanZ;
     let targetLeanX = pose.leanX;
     let targetScaleY = pose.scaleY;
-    let yawTarget = pose.yawTarget;
 
     // 情绪叠加
     if (this.mood === 'shy') {
-      yawTarget += 16;
-      targetLeanZ += Math.sin(t * 2.1) * 0.012;
+      targetLeanZ += 0.05;
+      targetLeanX += 0.012;
+      targetBob -= 0.006;
     } else if (this.mood === 'happy') {
       targetBob += Math.sin(t * 3.4) * 0.012 + 0.01;
     } else if (this.mood === 'sleepy') {
@@ -442,10 +361,9 @@ export class SpriteAnimator {
 
     // 拖拽：被拎起来时身体滞后、四肢下沉
     if (this.dragging) {
-      targetLeanZ += clamp(-this.dragVelSmooth.x * 0.00018, -0.17, 0.17);
-      targetLeanX += clamp(this.dragVelSmooth.y * 0.00011, -0.13, 0.13);
+      targetLeanZ += clamp(-this.dragVelSmooth.x * 0.0001, -0.09, 0.09);
+      targetLeanX += clamp(this.dragVelSmooth.y * 0.00006, -0.07, 0.07);
       targetBob += 0.05;
-      yawTarget += clamp(this.dragVelSmooth.x * 0.02, -45, 45);
     }
 
     if (this.freezePose) {
@@ -464,51 +382,20 @@ export class SpriteAnimator {
       this.sScaleY.step(targetScaleY, dt);
     }
 
-    // ---- 朝向：带预备动作的弹簧转身 ----
-    if (this.fixedYaw !== null && this.fixedYaw !== undefined) {
-      this.yaw = this.fixedYaw;
-      this.yawVel = 0;
-    } else {
-      const err = clamp(yawTarget, -180, 180) - this.yaw;
-      this.anticipateCd = Math.max(0, this.anticipateCd - dt);
-      // 大幅转向时先反向微转再甩过去，模仿真实转身的重心准备
-      if (Math.abs(err) > 46 && this.anticipateCd <= 0) {
-        this.yawVel -= Math.sign(err) * 26;
-        this.anticipateCd = 0.55;
-      }
-      const k = this.activity === 'lookAround' ? 34 : 46;
-      const acc = err * k - this.yawVel * 11;
-      this.yawVel += acc * dt;
-      this.yaw += this.yawVel * dt;
-      if (this.yaw > 180) {
-        this.yaw = 180;
-        this.yawVel = 0;
-      } else if (this.yaw < -180) {
-        this.yaw = -180;
-        this.yawVel = 0;
-      }
-    }
-
     // 侧倾时贴图绕脚底中心转动，会让较低一侧的底角扎进地面（看起来像"陷进地里"）。
     // 按倾角把整体抬高一截，使较低一侧恰好落在地面线上，重心转移才符合人体。
     const leanZ = this.sLeanZ.value;
     const groundLift =
       Math.sin(Math.min(Math.abs(leanZ), 0.4)) * (this.character.width || 4.35) * 0.5 * 0.62;
 
-    // 应用整体变换
+    // 应用整体变换（正面视角：只有升降 / 侧倾 / 俯仰 / 缩放，没有转向）
     this.root.position.y = this.baseRootY + this.sBob.value + this.jumpOffset + groundLift;
-    this.root.rotation.z = 0;
-    this.root.rotation.x = 0;
 
     const scaleY = clamp(this.sScaleY.value, 0.8, 1.2);
     const pivotScaleX = 1 - (scaleY - 1) * 0.45;
-    // 快速转身时横向收缩：模拟平面转向的透视缩短，抑制“扇形双影”的读感
-    const turnSquash = clamp(Math.abs(this.yawVel) / 190, 0, 1) * 0.075;
-    this.pivot.scale.set(pivotScaleX * (1 - turnSquash), scaleY, 1);
+    this.pivot.scale.set(pivotScaleX, scaleY, 1);
     this.pivot.rotation.z = leanZ;
     this.pivot.rotation.x = this.sLeanX.value;
-    // 贴图角度 + 透视旋转共同表现立体转身（旋转方向与贴图侧脸方向一致）
-    this.pivot.rotation.y = -THREE.MathUtils.degToRad(this.yaw) * 0.42;
 
     // 走动位移
     if (this.walkX !== undefined) {
@@ -519,7 +406,6 @@ export class SpriteAnimator {
       this.root.position.x = damp(this.root.position.x, this.baseRootX, 2.6, dt);
     }
 
-    this.applyFacing(dt);
     this.updateExpression(dt, pose);
   }
 
@@ -529,7 +415,6 @@ export class SpriteAnimator {
     let leanZ = 0;
     let leanX = 0;
     let scaleY = 1;
-    let yawTarget = this.lookSmooth.x * 24;
     let eyeClose = 0;
     const u = this.activityDuration > 0 ? clamp(this.activityTime / this.activityDuration, 0, 1) : 0;
 
@@ -547,8 +432,9 @@ export class SpriteAnimator {
         leanX = -0.046 - Math.sin(g * 2) * 0.007;
         scaleY = 1 + Math.cos(g * 2) * 0.013;
         if (this.walkX !== undefined) {
+          // 正面视角不转身，用轻微侧倾表现"往哪边走"
           const dir = Math.sign(this.walkX - this.root.position.x) || 1;
-          yawTarget = dir * 58;
+          leanZ += dir * 0.03;
         }
         break;
       }
@@ -556,22 +442,19 @@ export class SpriteAnimator {
         bob = -0.115;
         scaleY = 0.915;
         leanX = 0.032;
-        leanZ = Math.sin(t * 0.9) * 0.008;
-        yawTarget = yawTarget * 0.6 + 5;
+        leanZ = Math.sin(t * 0.9) * 0.008 + 0.02;
         break;
       case 'sleep':
         bob = -0.135 + Math.sin(t * 1.05) * 0.007;
         scaleY = 0.935 + Math.sin(t * 1.05) * 0.005;
-        leanZ = Math.sin(t * 0.42) * 0.022;
+        leanZ = Math.sin(t * 0.42) * 0.022 + 0.03;
         leanX = 0.055 + Math.sin(t * 1.05) * 0.004;
-        yawTarget = 8 + Math.sin(t * 0.25) * 5;
         break;
       case 'doze':
         bob = -0.075 + Math.sin(t * 1.2) * 0.006;
         scaleY = 0.962;
-        leanZ = Math.sin(t * 0.5) * 0.026;
+        leanZ = Math.sin(t * 0.5) * 0.026 + 0.02;
         leanX = 0.03;
-        yawTarget = 5;
         break;
       case 'stretch': {
         const k = sampleKeys(STRETCH_KEYS, u);
@@ -585,7 +468,6 @@ export class SpriteAnimator {
           leanZ += Math.sin(t * 26) * 0.004 * tri;
           bob += Math.sin(t * 21) * 0.0025 * tri;
         }
-        yawTarget = Math.sin(t * 0.8) * 4;
         break;
       }
       case 'yawn': {
@@ -595,7 +477,6 @@ export class SpriteAnimator {
         leanX = k.lx;
         leanZ = k.lz + (u > 0.3 && u < 0.72 ? Math.sin(t * 18) * 0.003 : 0);
         eyeClose = k.eye;
-        yawTarget = Math.sin(t * 0.7) * 3;
         break;
       }
       case 'tilt': {
@@ -604,7 +485,6 @@ export class SpriteAnimator {
         scaleY = k.sy;
         leanX = k.lx;
         leanZ = k.lz + Math.sin(t * 1.6) * 0.006;
-        yawTarget = 10 + Math.sin(t * 1.1) * 5;
         break;
       }
       case 'cheer': {
@@ -614,18 +494,15 @@ export class SpriteAnimator {
         scaleY = k.sy;
         leanZ = k.lz;
         leanX = k.lx;
-        yawTarget = 8 + Math.sin(t * 1.6) * 7;
         break;
       }
       case 'groom':
         leanZ = Math.sin(t * 3.1) * 0.026 + 0.02;
         leanX = 0.02 + Math.sin(t * 3.1) * 0.008;
         bob = -0.02;
-        yawTarget += 12 + Math.sin(t * 1.4) * 9;
         break;
       case 'hop':
         bob = Math.max(0, this.jumpOffset);
-        yawTarget = this.lookSmooth.x * 20;
         break;
       case 'giggle':
         bob = Math.abs(Math.sin(t * 8.2)) * 0.038;
@@ -635,13 +512,12 @@ export class SpriteAnimator {
       case 'shy':
         bob = -0.035;
         scaleY = 0.982;
-        yawTarget += 22;
-        leanZ = Math.sin(t * 1.9) * 0.018;
+        leanZ = 0.06 + Math.sin(t * 1.9) * 0.018;
         leanX = 0.02;
         break;
       case 'nod': {
         // 一次完整点头：快速下沉 + 缓慢回位（比等幅正弦更像真人）
-        const cyc = (u > 0 ? u : (t % 1.2) / 1.2);
+        const cyc = u > 0 ? u : (t % 1.2) / 1.2;
         const drop = Math.sin(clamp(cyc, 0, 1) * Math.PI);
         leanX = drop * 0.075;
         bob = -drop * 0.012;
@@ -650,16 +526,15 @@ export class SpriteAnimator {
       case 'wave':
       case 'greet':
         leanZ = Math.sin(t * 4.6) * 0.05;
-        yawTarget = 14 + Math.sin(t * 2.2) * 7;
         bob = Math.abs(Math.sin(t * 4.6)) * 0.012;
         break;
       case 'look':
-        yawTarget = this.lookSmooth.x * 34;
-        leanZ = Math.sin(t * 1.3) * 0.01;
+        leanZ = 0.03 + Math.sin(t * 1.3) * 0.02;
+        leanX = this.lookSmooth.y * -0.02;
         break;
       case 'lookAround':
-        yawTarget = Math.sin(t * 0.72) * 36;
-        leanZ = Math.sin(t * 0.72) * 0.018;
+        // 不转身，改为左右张望式的轻微重心转移
+        leanZ = Math.sin(t * 0.72) * 0.055;
         leanX = Math.sin(t * 0.36) * 0.008;
         break;
       default: {
@@ -675,15 +550,13 @@ export class SpriteAnimator {
       }
     }
 
-    return { bob, leanZ, leanX, scaleY, yawTarget, eyeClose };
+    return { bob, leanZ, leanX, scaleY, eyeClose };
   }
 
-  /** 表情覆盖层：眨眼 / 闭眼 / 脸红；闭眼贴片按朝向切换，侧身不再错用正脸。 */
+  /** 表情覆盖层：眨眼 / 闭眼 / 脸红（正面单张闭眼贴片）。 */
   updateExpression(dt, pose) {
     const expr = this.expression;
     if (!expr) return;
-
-    const yawAbs = Math.abs(this.yaw);
 
     // 眨眼节奏（真人眨眼 100~150ms）
     if (this.blinkPhase > 0) {
@@ -715,16 +588,19 @@ export class SpriteAnimator {
     // 调试/截图用：强制闭眼程度（一次眨眼只有 130ms，很难稳定截到半闭帧）
     const finalClose =
       this.debugClose === null || this.debugClose === undefined ? close : this.debugClose;
-    for (const eye of expr.eyes) {
+
+    const eye = expr.eye;
+    if (eye) {
       if (finalClose < 0.02) {
         eye.visible = false;
-        continue;
+        eye.material.opacity = 0;
+      } else {
+        eye.visible = true;
+        eye.material.opacity = clamp(finalClose, 0, 1);
       }
-      eye.visible = true;
-      eye.material.opacity = clamp(finalClose, 0, 1);
     }
 
-    // 脸红：害羞 / 开心 / 被摸脸；侧脸后淡出（腮红位置按正面标注，超过 58° 不再显示）
+    // 脸红：害羞 / 开心 / 被摸脸
     const wantBlush =
       this.mood === 'shy' ||
       this.mood === 'happy' ||
@@ -734,8 +610,7 @@ export class SpriteAnimator {
         ? 1
         : 0;
     this.blushVal = damp(this.blushVal, wantBlush, 5.5, dt);
-    const faceVisible = clamp((58 - yawAbs) / 22, 0, 1);
-    const blushOpacity = this.blushVal * faceVisible * 0.9;
+    const blushOpacity = this.blushVal * 0.9;
     for (const cheek of expr.blushes) {
       if (blushOpacity < 0.02) {
         cheek.visible = false;

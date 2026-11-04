@@ -323,7 +323,6 @@
     }
   };
   var _lut = ["00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "0a", "0b", "0c", "0d", "0e", "0f", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "1a", "1b", "1c", "1d", "1e", "1f", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "2a", "2b", "2c", "2d", "2e", "2f", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "3a", "3b", "3c", "3d", "3e", "3f", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "4a", "4b", "4c", "4d", "4e", "4f", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "5a", "5b", "5c", "5d", "5e", "5f", "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "6a", "6b", "6c", "6d", "6e", "6f", "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "7a", "7b", "7c", "7d", "7e", "7f", "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "8a", "8b", "8c", "8d", "8e", "8f", "90", "91", "92", "93", "94", "95", "96", "97", "98", "99", "9a", "9b", "9c", "9d", "9e", "9f", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "aa", "ab", "ac", "ad", "ae", "af", "b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "ba", "bb", "bc", "bd", "be", "bf", "c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "ca", "cb", "cc", "cd", "ce", "cf", "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "da", "db", "dc", "dd", "de", "df", "e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "ea", "eb", "ec", "ed", "ee", "ef", "f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "fa", "fb", "fc", "fd", "fe", "ff"];
-  var _seed = 1234567;
   var DEG2RAD = Math.PI / 180;
   var RAD2DEG = 180 / Math.PI;
   function generateUUID() {
@@ -340,101 +339,11 @@
   function euclideanModulo(n, m) {
     return (n % m + m) % m;
   }
-  function mapLinear(x, a1, a2, b1, b2) {
-    return b1 + (x - a1) * (b2 - b1) / (a2 - a1);
-  }
-  function inverseLerp(x, y, value) {
-    if (x !== y) {
-      return (value - x) / (y - x);
-    } else {
-      return 0;
-    }
-  }
   function lerp(x, y, t) {
     return (1 - t) * x + t * y;
   }
-  function damp(x, y, lambda, dt) {
-    return lerp(x, y, 1 - Math.exp(-lambda * dt));
-  }
-  function pingpong(x, length = 1) {
-    return length - Math.abs(euclideanModulo(x, length * 2) - length);
-  }
-  function smoothstep(x, min, max) {
-    if (x <= min) return 0;
-    if (x >= max) return 1;
-    x = (x - min) / (max - min);
-    return x * x * (3 - 2 * x);
-  }
-  function smootherstep(x, min, max) {
-    if (x <= min) return 0;
-    if (x >= max) return 1;
-    x = (x - min) / (max - min);
-    return x * x * x * (x * (x * 6 - 15) + 10);
-  }
-  function randInt(low, high) {
-    return low + Math.floor(Math.random() * (high - low + 1));
-  }
-  function randFloat(low, high) {
-    return low + Math.random() * (high - low);
-  }
-  function randFloatSpread(range) {
-    return range * (0.5 - Math.random());
-  }
-  function seededRandom(s) {
-    if (s !== void 0) _seed = s;
-    let t = _seed += 1831565813;
-    t = Math.imul(t ^ t >>> 15, t | 1);
-    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  }
-  function degToRad(degrees) {
-    return degrees * DEG2RAD;
-  }
-  function radToDeg(radians) {
-    return radians * RAD2DEG;
-  }
-  function isPowerOfTwo(value) {
-    return value > 0 && Number.isInteger(value) && 2 ** Math.round(Math.log2(value)) === value;
-  }
-  function ceilPowerOfTwo(value) {
-    return Math.pow(2, Math.ceil(Math.log(value) / Math.LN2));
-  }
   function floorPowerOfTwo(value) {
     return Math.pow(2, Math.floor(Math.log(value) / Math.LN2));
-  }
-  function setQuaternionFromProperEuler(q, a, b, c, order) {
-    const cos = Math.cos;
-    const sin = Math.sin;
-    const c2 = cos(b / 2);
-    const s2 = sin(b / 2);
-    const c13 = cos((a + c) / 2);
-    const s13 = sin((a + c) / 2);
-    const c1_3 = cos((a - c) / 2);
-    const s1_3 = sin((a - c) / 2);
-    const c3_1 = cos((c - a) / 2);
-    const s3_1 = sin((c - a) / 2);
-    switch (order) {
-      case "XYX":
-        q.set(c2 * s13, s2 * c1_3, s2 * s1_3, c2 * c13);
-        break;
-      case "YZY":
-        q.set(s2 * s1_3, c2 * s13, s2 * c1_3, c2 * c13);
-        break;
-      case "ZXZ":
-        q.set(s2 * c1_3, s2 * s1_3, c2 * s13, c2 * c13);
-        break;
-      case "XZX":
-        q.set(c2 * s13, s2 * s3_1, s2 * c3_1, c2 * c13);
-        break;
-      case "YXY":
-        q.set(s2 * c3_1, c2 * s13, s2 * s3_1, c2 * c13);
-        break;
-      case "ZYZ":
-        q.set(s2 * s3_1, s2 * c3_1, c2 * s13, c2 * c13);
-        break;
-      default:
-        warn("MathUtils: .setQuaternionFromProperEuler() encountered an unknown order: " + order);
-    }
   }
   function getNormalizationScale(array) {
     switch (array.constructor) {
@@ -467,250 +376,6 @@
     if (scale === void 0) throw new Error("THREE.MathUtils: Invalid component type.");
     return Math.round(value * scale);
   }
-  var MathUtils = {
-    DEG2RAD,
-    RAD2DEG,
-    /**
-     * Generate a [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier)
-     * (universally unique identifier).
-     *
-     * @static
-     * @method
-     * @return {string} The UUID.
-     */
-    generateUUID,
-    /**
-     * Clamps the given value between min and max.
-     *
-     * @static
-     * @method
-     * @param {number} value - The value to clamp.
-     * @param {number} min - The min value.
-     * @param {number} max - The max value.
-     * @return {number} The clamped value.
-     */
-    clamp,
-    /**
-     * Computes the Euclidean modulo of the given parameters that
-     * is `( ( n % m ) + m ) % m`.
-     *
-     * @static
-     * @method
-     * @param {number} n - The first parameter.
-     * @param {number} m - The second parameter.
-     * @return {number} The Euclidean modulo.
-     */
-    euclideanModulo,
-    /**
-     * Performs a linear mapping from range `<a1, a2>` to range `<b1, b2>`
-     * for the given value.
-     *
-     * @static
-     * @method
-     * @param {number} x - The value to be mapped.
-     * @param {number} a1 - Minimum value for range A.
-     * @param {number} a2 - Maximum value for range A.
-     * @param {number} b1 - Minimum value for range B.
-     * @param {number} b2 - Maximum value for range B.
-     * @return {number} The mapped value.
-     */
-    mapLinear,
-    /**
-     * Returns the percentage in the closed interval `[0, 1]` of the given value
-     * between the start and end point.
-     *
-     * @static
-     * @method
-     * @param {number} x - The start point
-     * @param {number} y - The end point.
-     * @param {number} value - A value between start and end.
-     * @return {number} The interpolation factor.
-     */
-    inverseLerp,
-    /**
-     * Returns a value linearly interpolated from two known points based on the given interval -
-     * `t = 0` will return `x` and `t = 1` will return `y`.
-     *
-     * @static
-     * @method
-     * @param {number} x - The start point
-     * @param {number} y - The end point.
-     * @param {number} t - The interpolation factor in the closed interval `[0, 1]`.
-     * @return {number} The interpolated value.
-     */
-    lerp,
-    /**
-     * Smoothly interpolate a number from `x` to `y` in  a spring-like manner using a delta
-     * time to maintain frame rate independent movement. For details, see
-     * [Frame rate independent damping using lerp](http://www.rorydriscoll.com/2016/03/07/frame-rate-independent-damping-using-lerp/).
-     *
-     * @static
-     * @method
-     * @param {number} x - The current point.
-     * @param {number} y - The target point.
-     * @param {number} lambda - A higher lambda value will make the movement more sudden,
-     * and a lower value will make the movement more gradual.
-     * @param {number} dt - Delta time in seconds.
-     * @return {number} The interpolated value.
-     */
-    damp,
-    /**
-     * Returns a value that alternates between `0` and the given `length` parameter.
-     *
-     * @static
-     * @method
-     * @param {number} x - The value to pingpong.
-     * @param {number} [length=1] - The positive value the function will pingpong to.
-     * @return {number} The alternated value.
-     */
-    pingpong,
-    /**
-     * Returns a value in the range `[0,1]` that represents the percentage that `x` has
-     * moved between `min` and `max`, but smoothed or slowed down the closer `x` is to
-     * the `min` and `max`.
-     *
-     * See [Smoothstep](http://en.wikipedia.org/wiki/Smoothstep) for more details.
-     *
-     * @static
-     * @method
-     * @param {number} x - The value to evaluate based on its position between min and max.
-     * @param {number} min - The min value. Any x value below min will be `0`.
-     * @param {number} max - The max value. Any x value above max will be `1`.
-     * @return {number} The alternated value.
-     */
-    smoothstep,
-    /**
-     * A [variation on smoothstep](https://en.wikipedia.org/wiki/Smoothstep#Variations)
-     * that has zero 1st and 2nd order derivatives at x=0 and x=1.
-     *
-     * @static
-     * @method
-     * @param {number} x - The value to evaluate based on its position between min and max.
-     * @param {number} min - The min value. Any x value below min will be `0`.
-     * @param {number} max - The max value. Any x value above max will be `1`.
-     * @return {number} The alternated value.
-     */
-    smootherstep,
-    /**
-     * Returns a random integer from `<low, high>` interval.
-     *
-     * @static
-     * @method
-     * @param {number} low - The lower value boundary.
-     * @param {number} high - The upper value boundary
-     * @return {number} A random integer.
-     */
-    randInt,
-    /**
-     * Returns a random float from `<low, high>` interval.
-     *
-     * @static
-     * @method
-     * @param {number} low - The lower value boundary.
-     * @param {number} high - The upper value boundary
-     * @return {number} A random float.
-     */
-    randFloat,
-    /**
-     * Returns a random integer from `<-range/2, range/2>` interval.
-     *
-     * @static
-     * @method
-     * @param {number} range - Defines the value range.
-     * @return {number} A random float.
-     */
-    randFloatSpread,
-    /**
-     * Returns a deterministic pseudo-random float in the interval `[0, 1]`.
-     *
-     * @static
-     * @method
-     * @param {number} [s] - The integer seed.
-     * @return {number} A random float.
-     */
-    seededRandom,
-    /**
-     * Converts degrees to radians.
-     *
-     * @static
-     * @method
-     * @param {number} degrees - A value in degrees.
-     * @return {number} The converted value in radians.
-     */
-    degToRad,
-    /**
-     * Converts radians to degrees.
-     *
-     * @static
-     * @method
-     * @param {number} radians - A value in radians.
-     * @return {number} The converted value in degrees.
-     */
-    radToDeg,
-    /**
-     * Returns `true` if the given number is a power of two.
-     *
-     * @static
-     * @method
-     * @param {number} value - The value to check.
-     * @return {boolean} Whether the given number is a power of two or not.
-     */
-    isPowerOfTwo,
-    /**
-     * Returns the smallest power of two that is greater than or equal to the given number.
-     *
-     * @static
-     * @method
-     * @param {number} value - The value to find a POT for.
-     * @return {number} The smallest power of two that is greater than or equal to the given number.
-     */
-    ceilPowerOfTwo,
-    /**
-     * Returns the largest power of two that is less than or equal to the given number.
-     *
-     * @static
-     * @method
-     * @param {number} value - The value to find a POT for.
-     * @return {number} The largest power of two that is less than or equal to the given number.
-     */
-    floorPowerOfTwo,
-    /**
-     * Sets the given quaternion from the [Intrinsic Proper Euler Angles](https://en.wikipedia.org/wiki/Euler_angles)
-     * defined by the given angles and order.
-     *
-     * Rotations are applied to the axes in the order specified by order:
-     * rotation by angle `a` is applied first, then by angle `b`, then by angle `c`.
-     *
-     * @static
-     * @method
-     * @param {Quaternion} q - The quaternion to set.
-     * @param {number} a - The rotation applied to the first axis, in radians.
-     * @param {number} b - The rotation applied to the second axis, in radians.
-     * @param {number} c - The rotation applied to the third axis, in radians.
-     * @param {('XYX'|'XZX'|'YXY'|'YZY'|'ZXZ'|'ZYZ')} order - A string specifying the axes order.
-     */
-    setQuaternionFromProperEuler,
-    /**
-     * Normalizes the given value according to the given typed array.
-     *
-     * @static
-     * @method
-     * @param {number} value - The float value in the range `[0,1]` to normalize.
-     * @param {TypedArray} array - The typed array that defines the data type of the value.
-     * @return {number} The normalize value.
-     */
-    normalize,
-    /**
-     * Denormalizes the given value according to the given typed array.
-     *
-     * @static
-     * @method
-     * @param {number} value - The value to denormalize.
-     * @param {TypedArray} array - The typed array that defines the data type of the value.
-     * @return {number} The denormalize (float) value in the range `[0,1]`.
-     */
-    denormalize
-  };
   var Vector2 = class {
     static {
       this.prototype.isVector2 = true;
@@ -27930,17 +27595,8 @@ void main() {
   var SPRITE_ASPECT = 1060 / 1120;
   var SPRITE_BODY_TOP = 1 - 64 / 1120;
   var SPRITE_BODY_BOTTOM = 1 - 1063 / 1120;
-  var DEGREES = [0, 20, 45, 90, 135, 180, 225, 270, 315];
-  var WIPE_REPEAT = 2.4;
-  var WIPE_SPAN = [-0.05, 1.05];
-  function spriteUrl(deg) {
-    const key = String(deg).padStart(3, "0");
-    return `../../assets/sprites/deg_${key}.png`;
-  }
-  function eyeUrl(deg) {
-    const key = String(deg).padStart(3, "0");
-    return `../../assets/sprites/blink/deg_${key}_eye.png`;
-  }
+  var BODY_SRC = "../../assets/sprites/deg_000.png";
+  var EYE_SRC = "../../assets/sprites/blink/deg_000_eye.png";
   function partFromUV(u, v) {
     const span = SPRITE_BODY_TOP - SPRITE_BODY_BOTTOM;
     const t = (v - SPRITE_BODY_BOTTOM) / span;
@@ -27961,52 +27617,17 @@ void main() {
   var BLUSH_H_PX = 84;
   var SPRITE_CW = 1060;
   var SPRITE_CH = 1120;
-  function canvasTexture(size, draw, { colorSpace = SRGBColorSpace } = {}) {
+  function canvasTexture(size, draw) {
     const canvas2 = document.createElement("canvas");
     canvas2.width = size;
     canvas2.height = size;
     const ctx = canvas2.getContext("2d");
     draw(ctx, size);
     const tex = new CanvasTexture(canvas2);
-    tex.colorSpace = colorSpace;
+    tex.colorSpace = SRGBColorSpace;
     tex.minFilter = LinearFilter;
     tex.magFilter = LinearFilter;
     tex.generateMipmaps = false;
-    return tex;
-  }
-  var MASK_W = 512;
-  var MASK_BAND = [192, 320];
-  function makeWipeMask(mirror) {
-    const canvas2 = document.createElement("canvas");
-    canvas2.width = MASK_W;
-    canvas2.height = 4;
-    const ctx = canvas2.getContext("2d");
-    const img = ctx.createImageData(MASK_W, 4);
-    for (let x = 0; x < MASK_W; x += 1) {
-      let a = 255;
-      if (x > MASK_BAND[0]) {
-        a = 255 * (1 - Math.min(1, (x - MASK_BAND[0]) / (MASK_BAND[1] - MASK_BAND[0])));
-      }
-      if (x === MASK_BAND[0]) a = 255;
-      const v = mirror ? 255 - a : a;
-      for (let y = 0; y < 4; y += 1) {
-        const i = (y * MASK_W + x) * 4;
-        img.data[i] = v;
-        img.data[i + 1] = v;
-        img.data[i + 2] = v;
-        img.data[i + 3] = 255;
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-    const tex = new CanvasTexture(canvas2);
-    tex.colorSpace = NoColorSpace;
-    tex.wrapS = ClampToEdgeWrapping;
-    tex.wrapT = ClampToEdgeWrapping;
-    tex.minFilter = LinearFilter;
-    tex.magFilter = LinearFilter;
-    tex.generateMipmaps = false;
-    tex.repeat.set(WIPE_REPEAT, 1);
-    tex.offset.set(0, 0);
     return tex;
   }
   function pxToLocal(px, py, width, height, planeY) {
@@ -28015,7 +27636,7 @@ void main() {
       y: planeY + (0.5 - py / SPRITE_CH) * height
     };
   }
-  function buildExpressionLayer(width, height, planeY, masks) {
+  function buildBlushLayer(width, height, planeY) {
     const group = new Group();
     const blushTexture = canvasTexture(128, (ctx, s) => {
       ctx.clearRect(0, 0, s, s);
@@ -28048,139 +27669,90 @@ void main() {
       group.add(mesh);
       blushes.push(mesh);
     }
-    return { group, eyes: [], blushes };
+    return { group, blushes };
   }
   function buildSpriteCharacter() {
     const root = new Group();
     const pivot = new Group();
     root.add(pivot);
     const loader = new TextureLoader();
-    const textures = /* @__PURE__ */ new Map();
-    const eyeTextures = /* @__PURE__ */ new Map();
-    for (const deg of DEGREES) {
-      const tex = loader.load(spriteUrl(deg));
-      tex.colorSpace = SRGBColorSpace;
-      tex.anisotropy = 8;
-      tex.minFilter = LinearMipmapLinearFilter;
-      tex.magFilter = LinearFilter;
-      tex.generateMipmaps = true;
-      tex.wrapS = ClampToEdgeWrapping;
-      tex.wrapT = ClampToEdgeWrapping;
-      textures.set(deg, tex);
-      const eye = loader.load(eyeUrl(deg));
-      eye.colorSpace = SRGBColorSpace;
-      eye.anisotropy = 4;
-      eye.minFilter = LinearFilter;
-      eye.magFilter = LinearFilter;
-      eye.generateMipmaps = false;
-      eye.wrapS = ClampToEdgeWrapping;
-      eye.wrapT = ClampToEdgeWrapping;
-      eyeTextures.set(deg, eye);
-    }
+    const bodyTexture = loader.load(BODY_SRC);
+    bodyTexture.colorSpace = SRGBColorSpace;
+    bodyTexture.anisotropy = 8;
+    bodyTexture.minFilter = LinearMipmapLinearFilter;
+    bodyTexture.magFilter = LinearFilter;
+    bodyTexture.generateMipmaps = true;
+    bodyTexture.wrapS = ClampToEdgeWrapping;
+    bodyTexture.wrapT = ClampToEdgeWrapping;
+    const eyeTexture = loader.load(EYE_SRC);
+    eyeTexture.colorSpace = SRGBColorSpace;
+    eyeTexture.anisotropy = 4;
+    eyeTexture.minFilter = LinearFilter;
+    eyeTexture.magFilter = LinearFilter;
+    eyeTexture.generateMipmaps = false;
+    eyeTexture.wrapS = ClampToEdgeWrapping;
+    eyeTexture.wrapT = ClampToEdgeWrapping;
     const height = 4.6;
     const width = height * SPRITE_ASPECT;
     const geometry = new PlaneGeometry(width, height);
-    const maskA = makeWipeMask(false);
-    const maskB = makeWipeMask(true);
-    function makePlane(order, mask, role) {
-      const material = new MeshBasicMaterial({
-        map: textures.get(0),
-        alphaMap: mask,
-        transparent: true,
-        depthWrite: false,
-        depthTest: false,
-        side: DoubleSide,
-        toneMapped: false
-      });
-      const mesh = new Mesh(geometry, material);
-      mesh.renderOrder = order;
-      mesh.userData.part = "torso";
-      mesh.userData.spriteRole = role;
-      mesh.userData.deg = 0;
-      return mesh;
-    }
-    const primary = makePlane(0, maskA, "primary");
-    const secondary = makePlane(1, maskB, "secondary");
     const footOffset = (SPRITE_BODY_BOTTOM - 0.5) * height;
     const footY = -1.44;
     const planeY = footY - footOffset;
-    primary.position.y = planeY;
-    secondary.position.y = planeY;
-    pivot.add(primary);
-    pivot.add(secondary);
-    const expression = buildExpressionLayer(width, height, planeY, { maskA, maskB });
-    for (const mask of [maskA, maskB]) {
-      const mat = new MeshBasicMaterial({
-        map: eyeTextures.get(0),
-        alphaMap: mask,
+    const body = new Mesh(
+      geometry,
+      new MeshBasicMaterial({
+        map: bodyTexture,
         transparent: true,
         depthWrite: false,
         depthTest: false,
         side: DoubleSide,
         toneMapped: false
-      });
-      mat.opacity = 0;
-      const mesh = new Mesh(geometry, mat);
-      mesh.position.y = planeY;
-      mesh.renderOrder = 6;
-      mesh.visible = false;
-      mesh.userData.part = "face";
-      mesh.userData.spriteRole = "eye";
-      pivot.add(mesh);
-      expression.eyes.push(mesh);
-    }
+      })
+    );
+    body.renderOrder = 0;
+    body.userData.part = "torso";
+    body.position.y = planeY;
+    pivot.add(body);
+    const eyeMaterial = new MeshBasicMaterial({
+      map: eyeTexture,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      side: DoubleSide,
+      toneMapped: false
+    });
+    eyeMaterial.opacity = 0;
+    const eye = new Mesh(geometry, eyeMaterial);
+    eye.position.y = planeY;
+    eye.renderOrder = 6;
+    eye.visible = false;
+    eye.userData.part = "face";
+    pivot.add(eye);
+    const expression = buildBlushLayer(width, height, planeY);
     pivot.add(expression.group);
-    function setWipe(p, reversed = false) {
-      void reversed;
-      const t = Math.min(1, Math.max(0, p));
-      const x = WIPE_SPAN[1] + (WIPE_SPAN[0] - WIPE_SPAN[1]) * t;
-      const offset = 0.5 - WIPE_REPEAT * x;
-      maskA.offset.x = offset;
-      maskB.offset.x = offset;
-    }
-    setWipe(0);
-    const spriteData = {
-      textures,
-      eyeTextures,
-      primary,
-      secondary,
-      expression,
-      width,
-      height,
-      footY,
-      planeY,
-      DEGREES,
-      masks: { a: maskA, b: maskB },
-      setWipe
-    };
-    root.userData.sprite = spriteData;
     return {
       root,
       pivot,
-      primary,
-      secondary,
-      textures,
-      eyeTextures,
-      expression,
+      body,
+      eye,
+      expression: { eye, blushes: expression.blushes },
+      bodyTexture,
+      eyeTexture,
       width,
       height,
       footY,
-      planeY,
-      DEGREES,
-      setWipe,
-      ...spriteData
+      planeY
     };
   }
 
   // src/renderer/js/spriteanimator.js
-  var D2R = Math.PI / 180;
   function clamp2(v, min, max) {
     return Math.min(max, Math.max(min, v));
   }
-  function damp2(cur, target, lambda, dt) {
+  function damp(cur, target, lambda, dt) {
     return cur + (target - cur) * (1 - Math.exp(-lambda * dt));
   }
-  function smoothstep2(t) {
+  function smoothstep(t) {
     const x = clamp2(t, 0, 1);
     return x * x * (3 - 2 * x);
   }
@@ -28212,7 +27784,7 @@ void main() {
     const k0 = keys[i];
     const k1 = keys[i + 1];
     const span = Math.max(1e-5, k1.t - k0.t);
-    const k = smoothstep2((t - k0.t) / span);
+    const k = smoothstep((t - k0.t) / span);
     const out = {};
     for (const key of Object.keys(k0)) {
       if (key === "t") continue;
@@ -28262,18 +27834,27 @@ void main() {
     { t: 0.94, bob: 0.07, sy: 1.022, lz: 8e-3, lx: -8e-3 },
     { t: 1, bob: 0, sy: 1, lz: 0, lx: 0 }
   ];
+  var REACT = {
+    ear: { bob: -0.9, leanZ: 2.6, leanX: 0, scaleY: 0.6 },
+    hat: { bob: -0.8, leanZ: -2.2, leanX: 0, scaleY: 0.5 },
+    hair: { bob: -0.7, leanZ: 2.2, leanX: 0, scaleY: 0.5 },
+    face: { bob: 0.8, leanZ: 1.9, leanX: 0, scaleY: 1.2 },
+    torso: { bob: 0.9, leanZ: 1.3, leanX: 0, scaleY: 1.3 },
+    skirt: { bob: 0.4, leanZ: 2.2, leanX: -1.2, scaleY: 0.5 },
+    tail: { bob: -0.5, leanZ: -1.8, leanX: 0.4, scaleY: 0.4 },
+    leg: { bob: -1, leanZ: 2, leanX: 0, scaleY: 0.5 },
+    happy: { bob: 0.9, leanZ: 0, leanX: 0, scaleY: 1 },
+    body: { bob: 1, leanZ: 1.4, leanX: 0, scaleY: 1.2 }
+  };
+  var REACT_TIME = 0.6;
   var SpriteAnimator = class {
     constructor(character2) {
       this.character = character2;
       this.root = character2.root;
       this.pivot = character2.pivot;
-      this.primary = character2.primary;
-      this.secondary = character2.secondary;
-      this.textures = character2.textures;
-      this.eyeTextures = character2.eyeTextures || null;
-      this.setWipe = character2.setWipe || (() => {
-      });
-      this.degrees = character2.DEGREES;
+      this.body = character2.body;
+      this.eye = character2.eye;
+      this.expression = character2.expression || null;
       this.baseRootY = this.root.position.y;
       this.baseRootX = this.root.position.x;
       this.activity = "idle";
@@ -28296,32 +27877,20 @@ void main() {
       this.jumpOffset = 0;
       this.jumpVel = 0;
       this.jumpActive = false;
-      this.yaw = 0;
-      this.yawVel = 0;
-      this.fixedYaw = null;
-      this.debugWipe = null;
       this.debugClose = null;
+      this.freezePose = false;
       this.blinkTimer = 2 + Math.random() * 2;
       this.blinkPhase = 0;
       this.noBlink = false;
       this.blushVal = 0;
-      this.freezePose = false;
-      this.expression = character2.expression || null;
       this.phase = Math.random() * 10;
       this.sBob = new Spring(0, 210, 26);
       this.sLeanZ = new Spring(0, 105, 16);
       this.sLeanX = new Spring(0, 105, 16);
       this.sScaleY = new Spring(1, 165, 21);
       this.gait = 0;
-      this.anticipateCd = 0;
-      this.yawnEye = 0;
-      this._degA = -1;
-      this._degB = -1;
-      this._p = 0;
-      this._lastYaw = 0;
-      this.applyFacing(1 / 60);
     }
-    // ---------- 兼容 3D 版接口 ----------
+    // ---------- 对外接口 ----------
     isBusy() {
       return this.busy || this.activity !== "idle";
     }
@@ -28351,10 +27920,9 @@ void main() {
     setMouth() {
     }
     triggerHappy() {
-      this.reactTimer = Math.max(this.reactTimer, 0.5);
+      this.reactTimer = Math.max(this.reactTimer, REACT_TIME);
       this.reactPart = "happy";
-      this.sBob.kick(0.9);
-      this.sScaleY.kick(0.9);
+      this.applyReact("happy");
     }
     setLook(x, y) {
       this.look.set(x, y);
@@ -28372,105 +27940,26 @@ void main() {
     }
     jump() {
       this.jumpActive = true;
-      this.jumpVel = 3.4;
-      this.sScaleY.kick(1.6);
+      this.jumpVel = 2.8;
+      this.sScaleY.kick(1);
     }
     /**
      * 点击反馈：给弹簧一个脉冲，由弹簧自然完成“受力—回弹—稳定”，
      * 而不是叠加一段正弦抖动（正弦叠加是最容易显得机械的做法）。
+     * 冲量见 REACT 表，幅度刻意压小：轻拍一下就够，不要整个人甩出去。
      */
     react(part) {
-      this.reactTimer = 0.7;
+      this.reactTimer = REACT_TIME;
       this.reactPart = part || "body";
       this.reactStrength = 1;
-      switch (part) {
-        case "ear":
-        case "hair":
-          this.sBob.kick(-1.5);
-          this.sLeanZ.kick(42);
-          this.yawVel += 34;
-          break;
-        case "hat":
-          this.sBob.kick(-1.2);
-          this.sLeanZ.kick(-36);
-          this.yawVel -= 26;
-          break;
-        case "face":
-          this.yawVel += 62;
-          this.sScaleY.kick(1.1);
-          break;
-        case "torso":
-          this.sBob.kick(0.8);
-          this.sScaleY.kick(1.5);
-          break;
-        case "skirt":
-          this.sLeanX.kick(-2.4);
-          this.sLeanZ.kick(38);
-          this.sBob.kick(0.5);
-          break;
-        case "tail":
-          this.yawVel -= 74;
-          this.sLeanZ.kick(-22);
-          break;
-        case "leg":
-          this.sBob.kick(-1.6);
-          this.sLeanZ.kick(30);
-          break;
-        default:
-          this.sBob.kick(1.1);
-          this.sLeanZ.kick(16);
-          break;
-      }
+      this.applyReact(part || "body");
     }
-    // ---------- 朝向贴图：滑动擦除 ----------
-    /** 按当前朝向选择相邻两帧，并把擦除进度推到该角度对应的位置。 */
-    applyFacing(dt) {
-      const degAbs = (this.yaw % 360 + 360) % 360;
-      const list = this.degrees;
-      let a = list[0];
-      let b = list[1];
-      let t = 0;
-      for (let i = 0; i < list.length; i += 1) {
-        const cur = list[i];
-        const next = list[(i + 1) % list.length];
-        const span = (next - cur + 360) % 360;
-        const local = (degAbs - cur + 360) % 360;
-        if (local <= span) {
-          a = cur;
-          b = next;
-          t = span > 0 ? local / span : 0;
-          break;
-        }
-      }
-      if (a !== this._degA) {
-        this.primary.material.map = this.textures.get(a);
-        if (this.eyeTextures && this.expression && this.expression.eyes[0]) {
-          this.expression.eyes[0].material.map = this.eyeTextures.get(a);
-        }
-        this._degA = a;
-      }
-      if (b !== this._degB) {
-        this.secondary.material.map = this.textures.get(b);
-        if (this.eyeTextures && this.expression && this.expression.eyes[1]) {
-          this.expression.eyes[1].material.map = this.eyeTextures.get(b);
-        }
-        this._degB = b;
-      }
-      let p = t;
-      if (this.debugWipe === null || this.debugWipe === void 0) {
-        const spin = Math.abs(this.yawVel);
-        let moving = clamp2((spin - 12) / 30, 0, 1);
-        moving = moving * moving * (3 - 2 * moving);
-        if (moving < 1) {
-          const snapped = t < 0.5 ? 0 : 1;
-          p = snapped + (t - snapped) * moving;
-        }
-      } else {
-        p = this.debugWipe;
-      }
-      this._p = damp2(this._p, p, 34, dt);
-      this.setWipe(this._p);
-      this.turnSpin = Math.abs(this.yawVel);
+    applyReact(part) {
+      const k = REACT[part] || REACT.body;
+      if (k.bob) this.sBob.kick(k.bob);
+      if (k.leanZ) this.sLeanZ.kick(k.leanZ);
+      if (k.leanX) this.sLeanX.kick(k.leanX);
+      if (k.scaleY) this.sScaleY.kick(k.scaleY);
     }
     // ---------- 主更新 ----------
     update(dt, elapsed2) {
@@ -28491,12 +27980,12 @@ void main() {
       }
       if (this.reactTimer > 0) {
         this.reactTimer = Math.max(0, this.reactTimer - dt);
-        this.reactStrength = this.reactTimer / 0.7;
+        this.reactStrength = this.reactTimer / REACT_TIME;
       }
-      this.lookSmooth.x = damp2(this.lookSmooth.x, this.look.x, 6, dt);
-      this.lookSmooth.y = damp2(this.lookSmooth.y, this.look.y, 6, dt);
-      this.dragVelSmooth.x = damp2(this.dragVelSmooth.x, this.dragVel.x, 8, dt);
-      this.dragVelSmooth.y = damp2(this.dragVelSmooth.y, this.dragVel.y, 8, dt);
+      this.lookSmooth.x = damp(this.lookSmooth.x, this.look.x, 6, dt);
+      this.lookSmooth.y = damp(this.lookSmooth.y, this.look.y, 6, dt);
+      this.dragVelSmooth.x = damp(this.dragVelSmooth.x, this.dragVel.x, 8, dt);
+      this.dragVelSmooth.y = damp(this.dragVelSmooth.y, this.dragVel.y, 8, dt);
       const pose = this.computePose(t, dt);
       if (this.jumpActive) {
         this.jumpVel -= 16 * dt;
@@ -28505,18 +27994,18 @@ void main() {
           this.jumpOffset = 0;
           this.jumpVel = 0;
           this.jumpActive = false;
-          this.sScaleY.kick(-1.9);
-          this.sBob.kick(-0.6);
+          this.sScaleY.kick(-1.2);
+          this.sBob.kick(-0.35);
         }
       }
       let targetBob = pose.bob;
       let targetLeanZ = pose.leanZ;
       let targetLeanX = pose.leanX;
       let targetScaleY = pose.scaleY;
-      let yawTarget = pose.yawTarget;
       if (this.mood === "shy") {
-        yawTarget += 16;
-        targetLeanZ += Math.sin(t * 2.1) * 0.012;
+        targetLeanZ += 0.05;
+        targetLeanX += 0.012;
+        targetBob -= 6e-3;
       } else if (this.mood === "happy") {
         targetBob += Math.sin(t * 3.4) * 0.012 + 0.01;
       } else if (this.mood === "sleepy") {
@@ -28527,10 +28016,9 @@ void main() {
         targetLeanX += 0.02;
       }
       if (this.dragging) {
-        targetLeanZ += clamp2(-this.dragVelSmooth.x * 18e-5, -0.17, 0.17);
-        targetLeanX += clamp2(this.dragVelSmooth.y * 11e-5, -0.13, 0.13);
+        targetLeanZ += clamp2(-this.dragVelSmooth.x * 1e-4, -0.09, 0.09);
+        targetLeanX += clamp2(this.dragVelSmooth.y * 6e-5, -0.07, 0.07);
         targetBob += 0.05;
-        yawTarget += clamp2(this.dragVelSmooth.x * 0.02, -45, 45);
       }
       if (this.freezePose) {
         targetBob = 0;
@@ -28547,48 +28035,21 @@ void main() {
         this.sLeanX.step(targetLeanX, dt);
         this.sScaleY.step(targetScaleY, dt);
       }
-      if (this.fixedYaw !== null && this.fixedYaw !== void 0) {
-        this.yaw = this.fixedYaw;
-        this.yawVel = 0;
-      } else {
-        const err = clamp2(yawTarget, -180, 180) - this.yaw;
-        this.anticipateCd = Math.max(0, this.anticipateCd - dt);
-        if (Math.abs(err) > 46 && this.anticipateCd <= 0) {
-          this.yawVel -= Math.sign(err) * 26;
-          this.anticipateCd = 0.55;
-        }
-        const k = this.activity === "lookAround" ? 34 : 46;
-        const acc = err * k - this.yawVel * 11;
-        this.yawVel += acc * dt;
-        this.yaw += this.yawVel * dt;
-        if (this.yaw > 180) {
-          this.yaw = 180;
-          this.yawVel = 0;
-        } else if (this.yaw < -180) {
-          this.yaw = -180;
-          this.yawVel = 0;
-        }
-      }
       const leanZ = this.sLeanZ.value;
       const groundLift = Math.sin(Math.min(Math.abs(leanZ), 0.4)) * (this.character.width || 4.35) * 0.5 * 0.62;
       this.root.position.y = this.baseRootY + this.sBob.value + this.jumpOffset + groundLift;
-      this.root.rotation.z = 0;
-      this.root.rotation.x = 0;
       const scaleY = clamp2(this.sScaleY.value, 0.8, 1.2);
       const pivotScaleX = 1 - (scaleY - 1) * 0.45;
-      const turnSquash = clamp2(Math.abs(this.yawVel) / 190, 0, 1) * 0.075;
-      this.pivot.scale.set(pivotScaleX * (1 - turnSquash), scaleY, 1);
+      this.pivot.scale.set(pivotScaleX, scaleY, 1);
       this.pivot.rotation.z = leanZ;
       this.pivot.rotation.x = this.sLeanX.value;
-      this.pivot.rotation.y = -MathUtils.degToRad(this.yaw) * 0.42;
       if (this.walkX !== void 0) {
         const targetX = this.walkX;
-        this.root.position.x = damp2(this.root.position.x, targetX, 3.6, dt);
+        this.root.position.x = damp(this.root.position.x, targetX, 3.6, dt);
         if (Math.abs(this.root.position.x - targetX) < 0.01) this.root.position.x = targetX;
       } else {
-        this.root.position.x = damp2(this.root.position.x, this.baseRootX, 2.6, dt);
+        this.root.position.x = damp(this.root.position.x, this.baseRootX, 2.6, dt);
       }
-      this.applyFacing(dt);
       this.updateExpression(dt, pose);
     }
     /** 计算当前动作的目标姿势（未过弹簧）。 */
@@ -28597,7 +28058,6 @@ void main() {
       let leanZ = 0;
       let leanX = 0;
       let scaleY = 1;
-      let yawTarget = this.lookSmooth.x * 24;
       let eyeClose = 0;
       const u = this.activityDuration > 0 ? clamp2(this.activityTime / this.activityDuration, 0, 1) : 0;
       switch (this.activity) {
@@ -28614,7 +28074,7 @@ void main() {
           scaleY = 1 + Math.cos(g * 2) * 0.013;
           if (this.walkX !== void 0) {
             const dir = Math.sign(this.walkX - this.root.position.x) || 1;
-            yawTarget = dir * 58;
+            leanZ += dir * 0.03;
           }
           break;
         }
@@ -28622,22 +28082,19 @@ void main() {
           bob = -0.115;
           scaleY = 0.915;
           leanX = 0.032;
-          leanZ = Math.sin(t * 0.9) * 8e-3;
-          yawTarget = yawTarget * 0.6 + 5;
+          leanZ = Math.sin(t * 0.9) * 8e-3 + 0.02;
           break;
         case "sleep":
           bob = -0.135 + Math.sin(t * 1.05) * 7e-3;
           scaleY = 0.935 + Math.sin(t * 1.05) * 5e-3;
-          leanZ = Math.sin(t * 0.42) * 0.022;
+          leanZ = Math.sin(t * 0.42) * 0.022 + 0.03;
           leanX = 0.055 + Math.sin(t * 1.05) * 4e-3;
-          yawTarget = 8 + Math.sin(t * 0.25) * 5;
           break;
         case "doze":
           bob = -0.075 + Math.sin(t * 1.2) * 6e-3;
           scaleY = 0.962;
-          leanZ = Math.sin(t * 0.5) * 0.026;
+          leanZ = Math.sin(t * 0.5) * 0.026 + 0.02;
           leanX = 0.03;
-          yawTarget = 5;
           break;
         case "stretch": {
           const k = sampleKeys(STRETCH_KEYS, u);
@@ -28650,7 +28107,6 @@ void main() {
             leanZ += Math.sin(t * 26) * 4e-3 * tri;
             bob += Math.sin(t * 21) * 25e-4 * tri;
           }
-          yawTarget = Math.sin(t * 0.8) * 4;
           break;
         }
         case "yawn": {
@@ -28660,7 +28116,6 @@ void main() {
           leanX = k.lx;
           leanZ = k.lz + (u > 0.3 && u < 0.72 ? Math.sin(t * 18) * 3e-3 : 0);
           eyeClose = k.eye;
-          yawTarget = Math.sin(t * 0.7) * 3;
           break;
         }
         case "tilt": {
@@ -28669,7 +28124,6 @@ void main() {
           scaleY = k.sy;
           leanX = k.lx;
           leanZ = k.lz + Math.sin(t * 1.6) * 6e-3;
-          yawTarget = 10 + Math.sin(t * 1.1) * 5;
           break;
         }
         case "cheer": {
@@ -28678,18 +28132,15 @@ void main() {
           scaleY = k.sy;
           leanZ = k.lz;
           leanX = k.lx;
-          yawTarget = 8 + Math.sin(t * 1.6) * 7;
           break;
         }
         case "groom":
           leanZ = Math.sin(t * 3.1) * 0.026 + 0.02;
           leanX = 0.02 + Math.sin(t * 3.1) * 8e-3;
           bob = -0.02;
-          yawTarget += 12 + Math.sin(t * 1.4) * 9;
           break;
         case "hop":
           bob = Math.max(0, this.jumpOffset);
-          yawTarget = this.lookSmooth.x * 20;
           break;
         case "giggle":
           bob = Math.abs(Math.sin(t * 8.2)) * 0.038;
@@ -28699,8 +28150,7 @@ void main() {
         case "shy":
           bob = -0.035;
           scaleY = 0.982;
-          yawTarget += 22;
-          leanZ = Math.sin(t * 1.9) * 0.018;
+          leanZ = 0.06 + Math.sin(t * 1.9) * 0.018;
           leanX = 0.02;
           break;
         case "nod": {
@@ -28713,16 +28163,14 @@ void main() {
         case "wave":
         case "greet":
           leanZ = Math.sin(t * 4.6) * 0.05;
-          yawTarget = 14 + Math.sin(t * 2.2) * 7;
           bob = Math.abs(Math.sin(t * 4.6)) * 0.012;
           break;
         case "look":
-          yawTarget = this.lookSmooth.x * 34;
-          leanZ = Math.sin(t * 1.3) * 0.01;
+          leanZ = 0.03 + Math.sin(t * 1.3) * 0.02;
+          leanX = this.lookSmooth.y * -0.02;
           break;
         case "lookAround":
-          yawTarget = Math.sin(t * 0.72) * 36;
-          leanZ = Math.sin(t * 0.72) * 0.018;
+          leanZ = Math.sin(t * 0.72) * 0.055;
           leanX = Math.sin(t * 0.36) * 8e-3;
           break;
         default: {
@@ -28735,13 +28183,12 @@ void main() {
           break;
         }
       }
-      return { bob, leanZ, leanX, scaleY, yawTarget, eyeClose };
+      return { bob, leanZ, leanX, scaleY, eyeClose };
     }
-    /** 表情覆盖层：眨眼 / 闭眼 / 脸红；闭眼贴片按朝向切换，侧身不再错用正脸。 */
+    /** 表情覆盖层：眨眼 / 闭眼 / 脸红（正面单张闭眼贴片）。 */
     updateExpression(dt, pose) {
       const expr = this.expression;
       if (!expr) return;
-      const yawAbs = Math.abs(this.yaw);
       if (this.blinkPhase > 0) {
         this.blinkPhase += dt / 0.13;
         if (this.blinkPhase >= 1) this.blinkPhase = 0;
@@ -28764,18 +28211,19 @@ void main() {
       const yawnClose = pose && pose.eyeClose ? pose.eyeClose : 0;
       const close = Math.max(blinkClose, sleepClose, yawnClose);
       const finalClose = this.debugClose === null || this.debugClose === void 0 ? close : this.debugClose;
-      for (const eye of expr.eyes) {
+      const eye = expr.eye;
+      if (eye) {
         if (finalClose < 0.02) {
           eye.visible = false;
-          continue;
+          eye.material.opacity = 0;
+        } else {
+          eye.visible = true;
+          eye.material.opacity = clamp2(finalClose, 0, 1);
         }
-        eye.visible = true;
-        eye.material.opacity = clamp2(finalClose, 0, 1);
       }
       const wantBlush = this.mood === "shy" || this.mood === "happy" || this.activity === "shy" || this.activity === "giggle" || this.reactTimer > 0 && (this.reactPart === "face" || this.reactPart === "happy") ? 1 : 0;
-      this.blushVal = damp2(this.blushVal, wantBlush, 5.5, dt);
-      const faceVisible = clamp2((58 - yawAbs) / 22, 0, 1);
-      const blushOpacity = this.blushVal * faceVisible * 0.9;
+      this.blushVal = damp(this.blushVal, wantBlush, 5.5, dt);
+      const blushOpacity = this.blushVal * 0.9;
       for (const cheek of expr.blushes) {
         if (blushOpacity < 0.02) {
           cheek.visible = false;

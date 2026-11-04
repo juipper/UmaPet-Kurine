@@ -314,8 +314,13 @@ function handleTap(part) {
   }
 
   if (before < 25 && after >= 25) showBubble('我们…好像熟悉一点了？', 3000);
-  else if (before < 55 && after >= 55) showBubble('开始有点亲近了呢。', 3000);
-  else if (before < 80 && after >= 80) showBubble('训练员是我最信赖的人！', 3200);
+  else if (before < 55 && after >= 55) {
+    showBubble('开始有点亲近了呢。', 3000);
+    animator.play('cheer', 2.0);
+  } else if (before < 80 && after >= 80) {
+    showBubble('训练员是我最信赖的人！', 3200);
+    animator.play('cheer', 2.0);
+  }
 }
 
 canvas.addEventListener('pointerup', endDrag);
@@ -363,8 +368,10 @@ setTimeout(() => {
   const hour = new Date().getHours();
   if (hour >= 23 || hour < 7) {
     showBubble('这么晚还在忙…要注意休息哦。', 3800);
+    animator.play('yawn', 2.6);
     animator.setMood('sleepy', 2.2);
   } else {
+    animator.play('wave', 2.0);
     say('greeting', 3400);
   }
 }, 2200);

@@ -13,6 +13,18 @@ function pick(list) {
 }
 
 /**
+ * 台词与动作的配对表：桌宠"说什么"就"做什么"，而不是动作与台词各走各的。
+ * 每条都能被 animator 的关键帧动作驱动，边说边做才不会显得机械。
+ */
+const CHAT_PAIRS = [
+  { group: 'yawn', action: 'yawn', dur: 2.6 },
+  { group: 'stretch', action: 'stretch', dur: 2.8 },
+  { group: 'tilt', action: 'tilt', dur: 2.0 },
+  { group: 'cheer', action: 'cheer', dur: 1.9 },
+  { group: 'groom', action: 'groom', dur: 2.3 }
+];
+
+/**
  * 自主行为调度器。
  * 桌宠不再靠固定计时器随机换表情，而是按「精力 / 无聊度 / 时段 / 鼠标位置」自己决定做什么。
  */
@@ -162,10 +174,18 @@ export class Behavior {
     if (this.current !== 'idle') return;
     this.decide();
 
-    // 长时间挂机的自言自语
+    // 长时间挂机的自言自语（台词与动作成对出现）
     if (elapsed - this.lastSpeak > 42 + Math.random() * 45) {
       this.lastSpeak = elapsed;
-      if (this.current !== 'sleep' && Math.random() < 0.6) this.onSpeak('idle');
+      if (this.current !== 'sleep' && Math.random() < 0.6) {
+        if (this.current === 'idle') {
+          const pair = pick(CHAT_PAIRS);
+          this.startActivity(pair.action, pair.dur);
+          this.onSpeak(pair.group);
+        } else {
+          this.onSpeak('idle');
+        }
+      }
     }
   }
 
@@ -187,9 +207,14 @@ export class Behavior {
     const veryTired = this.energy < 0.16;
     const nightSleepy = this.night && this.energy < 0.7;
 
-    // 极度疲惫 / 深夜：睡
+    // 极度疲惫 / 深夜：先打个哈欠，再睡
     if (veryTired || (nightSleepy && roll < 0.5)) {
-      this.startActivity('sleep', rand(25, 55));
+      if (Math.random() < 0.55) {
+        this.startActivity('yawn', rand(2.6, 3.0));
+        this.onSpeak('yawn');
+      } else {
+        this.startActivity('sleep', rand(25, 55));
+      }
       return;
     }
 
@@ -218,7 +243,10 @@ export class Behavior {
     const table = [
       { name: 'wander', w: boredBoost ? 30 : 16, dur: [3.0, 5.5] },
       { name: 'lookAround', w: 18, dur: [2.8, 4.2] },
-      { name: 'stretch', w: 12, dur: [2.2, 2.8] },
+      { name: 'stretch', w: 12, dur: [2.6, 3.0] },
+      { name: 'yawn', w: tired ? 14 : 8, dur: [2.6, 3.0] },
+      { name: 'tilt', w: 10, dur: [1.9, 2.4] },
+      { name: 'cheer', w: 6, dur: [1.8, 2.2] },
       { name: 'groom', w: 10, dur: [2.0, 2.6] },
       { name: 'hop', w: 8, dur: [0.8, 1.2] },
       { name: 'giggle', w: 8, dur: [1.2, 1.8] },
@@ -245,7 +273,11 @@ export class Behavior {
     const duration = rand(chosen.dur[0], chosen.dur[1]);
     this.startActivity(chosen.name, duration);
 
-    if (chosen.name === 'stretch' && Math.random() < 0.35) this.onSpeak('idle');
+    if (chosen.name === 'stretch' && Math.random() < 0.5) this.onSpeak('stretch');
+    if (chosen.name === 'yawn' && Math.random() < 0.6) this.onSpeak('yawn');
+    if (chosen.name === 'tilt' && Math.random() < 0.4) this.onSpeak('tilt');
+    if (chosen.name === 'cheer' && Math.random() < 0.5) this.onSpeak('cheer');
+    if (chosen.name === 'groom' && Math.random() < 0.35) this.onSpeak('groom');
     if (chosen.name === 'giggle' && Math.random() < 0.3) this.onSpeak('idle');
     if (chosen.name === 'sit' && Math.random() < 0.25) this.onSpeak('sit');
   }

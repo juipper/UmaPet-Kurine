@@ -27931,9 +27931,15 @@ void main() {
   var SPRITE_BODY_TOP = 1 - 64 / 1120;
   var SPRITE_BODY_BOTTOM = 1 - 1063 / 1120;
   var DEGREES = [0, 20, 45, 90, 135, 180, 225, 270, 315];
+  var WIPE_REPEAT = 2.4;
+  var WIPE_SPAN = [-0.05, 1.05];
   function spriteUrl(deg) {
     const key = String(deg).padStart(3, "0");
     return `../../assets/sprites/deg_${key}.png`;
+  }
+  function eyeUrl(deg) {
+    const key = String(deg).padStart(3, "0");
+    return `../../assets/sprites/blink/deg_${key}_eye.png`;
   }
   function partFromUV(u, v) {
     const span = SPRITE_BODY_TOP - SPRITE_BODY_BOTTOM;
@@ -27950,25 +27956,57 @@ void main() {
     if (t > 0.26) return "skirt";
     return "leg";
   }
-  var EYE_PX = [{ x: 520, y: 527 }, { x: 672, y: 522 }];
-  var EYE_W_PX = 116;
-  var EYE_H_PX = 92;
   var BLUSH_PX = [{ x: 472, y: 632 }, { x: 726, y: 626 }];
   var BLUSH_W_PX = 152;
   var BLUSH_H_PX = 84;
   var SPRITE_CW = 1060;
   var SPRITE_CH = 1120;
-  function canvasTexture(size, draw) {
+  function canvasTexture(size, draw, { colorSpace = SRGBColorSpace } = {}) {
     const canvas2 = document.createElement("canvas");
     canvas2.width = size;
     canvas2.height = size;
     const ctx = canvas2.getContext("2d");
     draw(ctx, size);
     const tex = new CanvasTexture(canvas2);
-    tex.colorSpace = SRGBColorSpace;
+    tex.colorSpace = colorSpace;
     tex.minFilter = LinearFilter;
     tex.magFilter = LinearFilter;
     tex.generateMipmaps = false;
+    return tex;
+  }
+  var MASK_W = 512;
+  var MASK_BAND = [192, 320];
+  function makeWipeMask(mirror) {
+    const canvas2 = document.createElement("canvas");
+    canvas2.width = MASK_W;
+    canvas2.height = 4;
+    const ctx = canvas2.getContext("2d");
+    const img = ctx.createImageData(MASK_W, 4);
+    for (let x = 0; x < MASK_W; x += 1) {
+      let a = 255;
+      if (x > MASK_BAND[0]) {
+        a = 255 * (1 - Math.min(1, (x - MASK_BAND[0]) / (MASK_BAND[1] - MASK_BAND[0])));
+      }
+      if (x === MASK_BAND[0]) a = 255;
+      const v = mirror ? 255 - a : a;
+      for (let y = 0; y < 4; y += 1) {
+        const i = (y * MASK_W + x) * 4;
+        img.data[i] = v;
+        img.data[i + 1] = v;
+        img.data[i + 2] = v;
+        img.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new CanvasTexture(canvas2);
+    tex.colorSpace = NoColorSpace;
+    tex.wrapS = ClampToEdgeWrapping;
+    tex.wrapT = ClampToEdgeWrapping;
+    tex.minFilter = LinearFilter;
+    tex.magFilter = LinearFilter;
+    tex.generateMipmaps = false;
+    tex.repeat.set(WIPE_REPEAT, 1);
+    tex.offset.set(0, 0);
     return tex;
   }
   function pxToLocal(px, py, width, height, planeY) {
@@ -27977,26 +28015,8 @@ void main() {
       y: planeY + (0.5 - py / SPRITE_CH) * height
     };
   }
-  function buildExpressionLayer(width, height, planeY) {
+  function buildExpressionLayer(width, height, planeY, masks) {
     const group = new Group();
-    const lidTexture = canvasTexture(128, (ctx, s) => {
-      ctx.clearRect(0, 0, s, s);
-      const grad = ctx.createRadialGradient(s * 0.5, s * 0.42, s * 0.06, s * 0.5, s * 0.52, s * 0.52);
-      grad.addColorStop(0, "rgba(252,222,206,1)");
-      grad.addColorStop(0.75, "rgba(250,216,199,0.98)");
-      grad.addColorStop(1, "rgba(248,210,192,0)");
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.ellipse(s * 0.5, s * 0.5, s * 0.5, s * 0.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(96,54,44,0.95)";
-      ctx.lineWidth = s * 0.055;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(s * 0.16, s * 0.56);
-      ctx.quadraticCurveTo(s * 0.5, s * 0.84, s * 0.84, s * 0.56);
-      ctx.stroke();
-    });
     const blushTexture = canvasTexture(128, (ctx, s) => {
       ctx.clearRect(0, 0, s, s);
       const grad = ctx.createRadialGradient(s * 0.5, s * 0.5, s * 0.04, s * 0.5, s * 0.5, s * 0.5);
@@ -28008,29 +28028,6 @@ void main() {
       ctx.ellipse(s * 0.5, s * 0.5, s * 0.5, s * 0.42, 0, 0, Math.PI * 2);
       ctx.fill();
     });
-    const lidW = EYE_W_PX / SPRITE_CW * width;
-    const lidH = EYE_H_PX / SPRITE_CH * height;
-    const lids = [];
-    for (const eye of EYE_PX) {
-      const geo = new PlaneGeometry(lidW, lidH);
-      geo.translate(0, -lidH / 2, 0);
-      const mat = new MeshBasicMaterial({
-        map: lidTexture,
-        transparent: true,
-        depthWrite: false,
-        depthTest: false,
-        toneMapped: false
-      });
-      mat.opacity = 0;
-      const mesh = new Mesh(geo, mat);
-      const pos = pxToLocal(eye.x, eye.y - EYE_H_PX * 0.42, width, height, planeY);
-      mesh.position.set(pos.x, pos.y, 0.05);
-      mesh.scale.y = 0.02;
-      mesh.renderOrder = 6;
-      mesh.visible = false;
-      group.add(mesh);
-      lids.push(mesh);
-    }
     const blushW = BLUSH_W_PX / SPRITE_CW * width;
     const blushH = BLUSH_H_PX / SPRITE_CH * height;
     const blushes = [];
@@ -28045,13 +28042,13 @@ void main() {
       mat.opacity = 0;
       const mesh = new Mesh(new PlaneGeometry(blushW, blushH), mat);
       const pos = pxToLocal(cheek.x, cheek.y, width, height, planeY);
-      mesh.position.set(pos.x, pos.y, 0.04);
+      mesh.position.set(pos.x, pos.y, 0.05);
       mesh.renderOrder = 5;
       mesh.visible = false;
       group.add(mesh);
       blushes.push(mesh);
     }
-    return { group, lids, blushes };
+    return { group, eyes: [], blushes };
   }
   function buildSpriteCharacter() {
     const root = new Group();
@@ -28059,6 +28056,7 @@ void main() {
     root.add(pivot);
     const loader = new TextureLoader();
     const textures = /* @__PURE__ */ new Map();
+    const eyeTextures = /* @__PURE__ */ new Map();
     for (const deg of DEGREES) {
       const tex = loader.load(spriteUrl(deg));
       tex.colorSpace = SRGBColorSpace;
@@ -28069,13 +28067,25 @@ void main() {
       tex.wrapS = ClampToEdgeWrapping;
       tex.wrapT = ClampToEdgeWrapping;
       textures.set(deg, tex);
+      const eye = loader.load(eyeUrl(deg));
+      eye.colorSpace = SRGBColorSpace;
+      eye.anisotropy = 4;
+      eye.minFilter = LinearFilter;
+      eye.magFilter = LinearFilter;
+      eye.generateMipmaps = false;
+      eye.wrapS = ClampToEdgeWrapping;
+      eye.wrapT = ClampToEdgeWrapping;
+      eyeTextures.set(deg, eye);
     }
     const height = 4.6;
     const width = height * SPRITE_ASPECT;
     const geometry = new PlaneGeometry(width, height);
-    function makePlane(order) {
+    const maskA = makeWipeMask(false);
+    const maskB = makeWipeMask(true);
+    function makePlane(order, mask, role) {
       const material = new MeshBasicMaterial({
         map: textures.get(0),
+        alphaMap: mask,
         transparent: true,
         depthWrite: false,
         depthTest: false,
@@ -28085,13 +28095,12 @@ void main() {
       const mesh = new Mesh(geometry, material);
       mesh.renderOrder = order;
       mesh.userData.part = "torso";
-      mesh.userData.spriteRole = order === 0 ? "primary" : "secondary";
+      mesh.userData.spriteRole = role;
       mesh.userData.deg = 0;
       return mesh;
     }
-    const primary = makePlane(0);
-    const secondary = makePlane(1);
-    secondary.material.opacity = 0;
+    const primary = makePlane(0, maskA, "primary");
+    const secondary = makePlane(1, maskB, "secondary");
     const footOffset = (SPRITE_BODY_BOTTOM - 0.5) * height;
     const footY = -1.44;
     const planeY = footY - footOffset;
@@ -28099,10 +28108,40 @@ void main() {
     secondary.position.y = planeY;
     pivot.add(primary);
     pivot.add(secondary);
-    const expression = buildExpressionLayer(width, height, planeY);
+    const expression = buildExpressionLayer(width, height, planeY, { maskA, maskB });
+    for (const mask of [maskA, maskB]) {
+      const mat = new MeshBasicMaterial({
+        map: eyeTextures.get(0),
+        alphaMap: mask,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        side: DoubleSide,
+        toneMapped: false
+      });
+      mat.opacity = 0;
+      const mesh = new Mesh(geometry, mat);
+      mesh.position.y = planeY;
+      mesh.renderOrder = 6;
+      mesh.visible = false;
+      mesh.userData.part = "face";
+      mesh.userData.spriteRole = "eye";
+      pivot.add(mesh);
+      expression.eyes.push(mesh);
+    }
     pivot.add(expression.group);
-    root.userData.sprite = {
+    function setWipe(p, reversed = false) {
+      void reversed;
+      const t = Math.min(1, Math.max(0, p));
+      const x = WIPE_SPAN[1] + (WIPE_SPAN[0] - WIPE_SPAN[1]) * t;
+      const offset = 0.5 - WIPE_REPEAT * x;
+      maskA.offset.x = offset;
+      maskB.offset.x = offset;
+    }
+    setWipe(0);
+    const spriteData = {
       textures,
+      eyeTextures,
       primary,
       secondary,
       expression,
@@ -28110,31 +28149,119 @@ void main() {
       height,
       footY,
       planeY,
-      DEGREES
+      DEGREES,
+      masks: { a: maskA, b: maskB },
+      setWipe
     };
+    root.userData.sprite = spriteData;
     return {
       root,
       pivot,
       primary,
       secondary,
       textures,
+      eyeTextures,
       expression,
       width,
       height,
       footY,
       planeY,
-      DEGREES
+      DEGREES,
+      setWipe,
+      ...spriteData
     };
   }
 
   // src/renderer/js/spriteanimator.js
   var D2R = Math.PI / 180;
-  function damp2(cur, target, lambda, dt) {
-    return cur + (target - cur) * (1 - Math.exp(-lambda * dt));
-  }
   function clamp2(v, min, max) {
     return Math.min(max, Math.max(min, v));
   }
+  function damp2(cur, target, lambda, dt) {
+    return cur + (target - cur) * (1 - Math.exp(-lambda * dt));
+  }
+  function smoothstep2(t) {
+    const x = clamp2(t, 0, 1);
+    return x * x * (3 - 2 * x);
+  }
+  var Spring = class {
+    constructor(value, stiffness, damping) {
+      this.value = value;
+      this.vel = 0;
+      this.k = stiffness;
+      this.c = damping;
+    }
+    step(target, dt) {
+      const acc = (target - this.value) * this.k - this.vel * this.c;
+      this.vel += acc * dt;
+      this.value += this.vel * dt;
+      return this.value;
+    }
+    kick(v) {
+      this.vel += v;
+    }
+    reset(v, vel = 0) {
+      this.value = v;
+      this.vel = vel;
+    }
+  };
+  function sampleKeys(keys, u) {
+    const t = clamp2(u, 0, 1);
+    let i = 0;
+    while (i < keys.length - 2 && t > keys[i + 1].t) i += 1;
+    const k0 = keys[i];
+    const k1 = keys[i + 1];
+    const span = Math.max(1e-5, k1.t - k0.t);
+    const k = smoothstep2((t - k0.t) / span);
+    const out = {};
+    for (const key of Object.keys(k0)) {
+      if (key === "t") continue;
+      const v0 = k0[key] === void 0 ? 0 : k0[key];
+      const v1 = k1[key] === void 0 ? 0 : k1[key];
+      out[key] = v0 + (v1 - v0) * k;
+    }
+    return out;
+  }
+  var STRETCH_KEYS = [
+    { t: 0, bob: 0, sy: 1, lx: 0, lz: 0 },
+    { t: 0.14, bob: -0.062, sy: 0.962, lx: 0.052, lz: -8e-3 },
+    { t: 0.34, bob: 0.03, sy: 1.055, lx: -0.115, lz: 8e-3 },
+    { t: 0.5, bob: 0.108, sy: 1.104, lx: -0.216, lz: 0.018 },
+    { t: 0.62, bob: 0.106, sy: 1.102, lx: -0.212, lz: 0.014 },
+    { t: 0.74, bob: 0.092, sy: 1.086, lx: -0.172, lz: -0.012 },
+    { t: 0.88, bob: 4e-3, sy: 1.004, lx: 0.028, lz: 0 },
+    { t: 1, bob: 0, sy: 1, lx: 0, lz: 0 }
+  ];
+  var YAWN_KEYS = [
+    { t: 0, bob: 0, sy: 1, lx: 0, lz: 0, eye: 0 },
+    { t: 0.16, bob: -0.03, sy: 0.982, lx: 0.044, lz: -6e-3, eye: 0.12 },
+    { t: 0.34, bob: 0.046, sy: 1.052, lx: -0.198, lz: 6e-3, eye: 0.96 },
+    { t: 0.58, bob: 0.044, sy: 1.05, lx: -0.194, lz: 4e-3, eye: 1 },
+    { t: 0.68, bob: 0.036, sy: 1.04, lx: -0.17, lz: -8e-3, eye: 1 },
+    { t: 0.82, bob: -0.016, sy: 0.978, lx: 0.05, lz: 0, eye: 0.44 },
+    { t: 0.92, bob: 8e-3, sy: 1.014, lx: -8e-3, lz: 0, eye: 0.08 },
+    { t: 1, bob: 0, sy: 1, lx: 0, lz: 0, eye: 0 }
+  ];
+  var TILT_KEYS = [
+    { t: 0, bob: 0, sy: 1, lx: 0, lz: 0 },
+    { t: 0.2, bob: 0.012, sy: 1.012, lx: -0.012, lz: 0.132 },
+    { t: 0.5, bob: 0.016, sy: 1.014, lx: -8e-3, lz: 0.142 },
+    { t: 0.66, bob: 0.014, sy: 1.012, lx: -0.01, lz: 0.136 },
+    { t: 0.86, bob: -6e-3, sy: 0.994, lx: 0.01, lz: 0.024 },
+    { t: 1, bob: 0, sy: 1, lx: 0, lz: 0 }
+  ];
+  var CHEER_KEYS = [
+    { t: 0, bob: 0, sy: 1, lz: 0, lx: 0 },
+    { t: 0.12, bob: -0.072, sy: 0.944, lz: -0.012, lx: 0.038 },
+    { t: 0.28, bob: 0.19, sy: 1.056, lz: 0.03, lx: -0.034 },
+    { t: 0.38, bob: 0.186, sy: 1.054, lz: 0.028, lx: -0.032 },
+    { t: 0.5, bob: 0, sy: 0.952, lz: 4e-3, lx: 0.022 },
+    { t: 0.66, bob: 0.152, sy: 1.044, lz: -0.026, lx: -0.026 },
+    { t: 0.73, bob: 0.148, sy: 1.042, lz: -0.024, lx: -0.024 },
+    { t: 0.86, bob: 0, sy: 0.968, lz: 0, lx: 0.014 },
+    { t: 0.94, bob: 0.07, sy: 1.022, lz: 8e-3, lx: -8e-3 },
+    { t: 1, bob: 0, sy: 1, lz: 0, lx: 0 }
+  ];
   var SpriteAnimator = class {
     constructor(character2) {
       this.character = character2;
@@ -28143,6 +28270,9 @@ void main() {
       this.primary = character2.primary;
       this.secondary = character2.secondary;
       this.textures = character2.textures;
+      this.eyeTextures = character2.eyeTextures || null;
+      this.setWipe = character2.setWipe || (() => {
+      });
       this.degrees = character2.DEGREES;
       this.baseRootY = this.root.position.y;
       this.baseRootX = this.root.position.x;
@@ -28162,21 +28292,34 @@ void main() {
       this.dragVelSmooth = { x: 0, y: 0 };
       this.reactTimer = 0;
       this.reactPart = null;
+      this.reactStrength = 0;
       this.jumpOffset = 0;
       this.jumpVel = 0;
       this.jumpActive = false;
       this.yaw = 0;
+      this.yawVel = 0;
       this.fixedYaw = null;
+      this.debugWipe = null;
+      this.debugClose = null;
       this.blinkTimer = 2 + Math.random() * 2;
       this.blinkPhase = 0;
+      this.noBlink = false;
       this.blushVal = 0;
       this.freezePose = false;
       this.expression = character2.expression || null;
       this.phase = Math.random() * 10;
-      this._degA = 0;
-      this._degB = 0;
-      this._mixT = 0;
-      this.applyFacing(0, 1);
+      this.sBob = new Spring(0, 210, 26);
+      this.sLeanZ = new Spring(0, 105, 16);
+      this.sLeanX = new Spring(0, 105, 16);
+      this.sScaleY = new Spring(1, 165, 21);
+      this.gait = 0;
+      this.anticipateCd = 0;
+      this.yawnEye = 0;
+      this._degA = -1;
+      this._degB = -1;
+      this._p = 0;
+      this._lastYaw = 0;
+      this.applyFacing(1 / 60);
     }
     // ---------- 兼容 3D 版接口 ----------
     isBusy() {
@@ -28184,6 +28327,10 @@ void main() {
     }
     play(activity, duration = null, options = {}) {
       const next = activity || "idle";
+      if (next !== this.activity) {
+        this.activityTime = 0;
+        this.gait = 0;
+      }
       this.activity = next;
       this.activityTime = 0;
       this.activityDuration = duration || 0;
@@ -28206,6 +28353,8 @@ void main() {
     triggerHappy() {
       this.reactTimer = Math.max(this.reactTimer, 0.5);
       this.reactPart = "happy";
+      this.sBob.kick(0.9);
+      this.sScaleY.kick(0.9);
     }
     setLook(x, y) {
       this.look.set(x, y);
@@ -28224,16 +28373,62 @@ void main() {
     jump() {
       this.jumpActive = true;
       this.jumpVel = 3.4;
+      this.sScaleY.kick(1.6);
     }
+    /**
+     * 点击反馈：给弹簧一个脉冲，由弹簧自然完成“受力—回弹—稳定”，
+     * 而不是叠加一段正弦抖动（正弦叠加是最容易显得机械的做法）。
+     */
     react(part) {
-      this.reactTimer = 0.75;
+      this.reactTimer = 0.7;
       this.reactPart = part || "body";
+      this.reactStrength = 1;
+      switch (part) {
+        case "ear":
+        case "hair":
+          this.sBob.kick(-1.5);
+          this.sLeanZ.kick(42);
+          this.yawVel += 34;
+          break;
+        case "hat":
+          this.sBob.kick(-1.2);
+          this.sLeanZ.kick(-36);
+          this.yawVel -= 26;
+          break;
+        case "face":
+          this.yawVel += 62;
+          this.sScaleY.kick(1.1);
+          break;
+        case "torso":
+          this.sBob.kick(0.8);
+          this.sScaleY.kick(1.5);
+          break;
+        case "skirt":
+          this.sLeanX.kick(-2.4);
+          this.sLeanZ.kick(38);
+          this.sBob.kick(0.5);
+          break;
+        case "tail":
+          this.yawVel -= 74;
+          this.sLeanZ.kick(-22);
+          break;
+        case "leg":
+          this.sBob.kick(-1.6);
+          this.sLeanZ.kick(30);
+          break;
+        default:
+          this.sBob.kick(1.1);
+          this.sLeanZ.kick(16);
+          break;
+      }
     }
-    /** 朝向贴图切换：按角度在相邻两张之间交叉淡入。 */
-    applyFacing(degAbs, mixTarget) {
+    // ---------- 朝向贴图：滑动擦除 ----------
+    /** 按当前朝向选择相邻两帧，并把擦除进度推到该角度对应的位置。 */
+    applyFacing(dt) {
+      const degAbs = (this.yaw % 360 + 360) % 360;
       const list = this.degrees;
-      let a = 0;
-      let b = 0;
+      let a = list[0];
+      let b = list[1];
       let t = 0;
       for (let i = 0; i < list.length; i += 1) {
         const cur = list[i];
@@ -28249,17 +28444,33 @@ void main() {
       }
       if (a !== this._degA) {
         this.primary.material.map = this.textures.get(a);
-        this.primary.material.needsUpdate = true;
+        if (this.eyeTextures && this.expression && this.expression.eyes[0]) {
+          this.expression.eyes[0].material.map = this.eyeTextures.get(a);
+        }
         this._degA = a;
       }
       if (b !== this._degB) {
         this.secondary.material.map = this.textures.get(b);
-        this.secondary.material.needsUpdate = true;
+        if (this.eyeTextures && this.expression && this.expression.eyes[1]) {
+          this.expression.eyes[1].material.map = this.eyeTextures.get(b);
+        }
         this._degB = b;
       }
-      this._mixT = damp2(this._mixT, clamp2(t, 0, 0.92), 18, 1 / 60);
-      this.primary.material.opacity = 1;
-      this.secondary.material.opacity = this._mixT * 0.85;
+      let p = t;
+      if (this.debugWipe === null || this.debugWipe === void 0) {
+        const spin = Math.abs(this.yawVel);
+        let moving = clamp2((spin - 12) / 30, 0, 1);
+        moving = moving * moving * (3 - 2 * moving);
+        if (moving < 1) {
+          const snapped = t < 0.5 ? 0 : 1;
+          p = snapped + (t - snapped) * moving;
+        }
+      } else {
+        p = this.debugWipe;
+      }
+      this._p = damp2(this._p, p, 34, dt);
+      this.setWipe(this._p);
+      this.turnSpin = Math.abs(this.yawVel);
     }
     // ---------- 主更新 ----------
     update(dt, elapsed2) {
@@ -28278,153 +28489,15 @@ void main() {
         this.moodTime -= dt;
         if (this.moodTime <= 0) this.mood = null;
       }
-      if (this.reactTimer > 0) this.reactTimer = Math.max(0, this.reactTimer - dt);
+      if (this.reactTimer > 0) {
+        this.reactTimer = Math.max(0, this.reactTimer - dt);
+        this.reactStrength = this.reactTimer / 0.7;
+      }
       this.lookSmooth.x = damp2(this.lookSmooth.x, this.look.x, 6, dt);
       this.lookSmooth.y = damp2(this.lookSmooth.y, this.look.y, 6, dt);
       this.dragVelSmooth.x = damp2(this.dragVelSmooth.x, this.dragVel.x, 8, dt);
       this.dragVelSmooth.y = damp2(this.dragVelSmooth.y, this.dragVel.y, 8, dt);
-      let bob = 0;
-      let leanZ = 0;
-      let leanX = 0;
-      let scaleY = 1;
-      let yawTarget = this.lookSmooth.x * 24;
-      let speed = this.walkSpeed;
-      switch (this.activity) {
-        case "walk":
-        case "peek": {
-          const rate = speed * 0.5;
-          bob = Math.abs(Math.sin(t * rate)) * 0.085;
-          leanZ = Math.sin(t * rate) * 0.045;
-          leanX = -0.035;
-          scaleY = 1 + Math.sin(t * rate * 2) * 0.012;
-          if (this.walkX !== void 0) {
-            const dir = Math.sign(this.walkX - this.root.position.x) || 1;
-            yawTarget = dir * 62;
-          }
-          break;
-        }
-        case "sit":
-          bob = -0.1;
-          scaleY = 0.94;
-          leanX = 0.02;
-          yawTarget *= 0.6;
-          break;
-        case "sleep":
-          bob = -0.16 + Math.sin(t * 0.9) * 8e-3;
-          scaleY = 0.9 + Math.sin(t * 0.9) * 6e-3;
-          leanZ = Math.sin(t * 0.42) * 0.02;
-          leanX = 0.05;
-          yawTarget = 8 + Math.sin(t * 0.25) * 4;
-          break;
-        case "doze":
-          bob = -0.08 + Math.sin(t * 1.1) * 6e-3;
-          scaleY = 0.96;
-          leanZ = Math.sin(t * 0.5) * 0.025;
-          yawTarget = 5;
-          break;
-        case "stretch": {
-          const k = Math.sin(Math.min(1, this.activityTime / 0.9) * Math.PI);
-          bob = 0.06 * k;
-          scaleY = 1 + 0.06 * k;
-          leanX = -0.05 * k;
-          break;
-        }
-        case "groom":
-          leanZ = Math.sin(t * 4.2) * 0.03;
-          yawTarget += 12 + Math.sin(t * 1.4) * 8;
-          break;
-        case "hop":
-          bob = Math.max(0, this.jumpOffset);
-          break;
-        case "giggle":
-          bob = Math.abs(Math.sin(t * 9)) * 0.045;
-          leanZ = Math.sin(t * 6) * 0.05;
-          scaleY = 1 + Math.sin(t * 9) * 0.01;
-          break;
-        case "shy":
-          bob = -0.04;
-          scaleY = 0.98;
-          yawTarget += 20;
-          leanZ = Math.sin(t * 2.4) * 0.02;
-          break;
-        case "nod":
-          leanX = Math.sin(t * 8) * 0.055;
-          break;
-        case "wave":
-        case "greet":
-          leanZ = Math.sin(t * 7) * 0.055;
-          yawTarget = 14 + Math.sin(t * 3) * 6;
-          break;
-        case "look":
-          yawTarget = this.lookSmooth.x * 34;
-          leanZ = Math.sin(t * 1.6) * 0.014;
-          break;
-        case "lookAround":
-          yawTarget = Math.sin(t * 1.05) * 34;
-          leanZ = Math.sin(t * 1.05) * 0.02;
-          break;
-        default: {
-          bob = Math.sin(t * 1.5) * 0.014;
-          scaleY = 1 + Math.sin(t * 1.5 + 0.4) * 7e-3;
-          leanZ = Math.sin(t * 0.72) * 0.013;
-          leanX = this.lookSmooth.y * -0.02;
-          break;
-        }
-      }
-      if (this.mood === "shy") {
-        yawTarget += 16;
-        leanZ += Math.sin(t * 3.1) * 0.018;
-      } else if (this.mood === "happy") {
-        bob += Math.abs(Math.sin(t * 6)) * 0.03;
-      } else if (this.mood === "sleepy") {
-        bob -= 0.03;
-        scaleY *= 0.985;
-      } else if (this.mood === "angry") {
-        leanX += 0.02;
-      }
-      if (this.reactTimer > 0) {
-        const k = this.reactTimer / 0.75;
-        switch (this.reactPart) {
-          case "ear":
-          case "hat":
-          case "hair":
-            bob -= 0.03 * k;
-            leanZ += Math.sin(t * 14) * 0.03 * k;
-            yawTarget += 10 * k;
-            break;
-          case "face":
-            yawTarget += Math.sin(t * 16) * 14 * k;
-            bob -= 0.02 * k;
-            break;
-          case "torso":
-            bob += 0.045 * k;
-            scaleY *= 1 + 0.02 * k;
-            break;
-          case "skirt":
-            leanX -= 0.04 * k;
-            leanZ += Math.sin(t * 18) * 0.035 * k;
-            bob += Math.abs(Math.sin(t * 12)) * 0.02 * k;
-            break;
-          case "tail":
-            leanZ += Math.sin(t * 12) * 0.05 * k;
-            yawTarget -= 14 * k;
-            break;
-          case "leg":
-            bob -= 0.05 * k;
-            leanZ += Math.sin(t * 15) * 0.04 * k;
-            break;
-          default:
-            bob += Math.abs(Math.sin(t * 10)) * 0.035 * k;
-            leanZ += Math.sin(t * 8) * 0.025 * k;
-            break;
-        }
-      }
-      if (this.dragging) {
-        leanZ += clamp2(-this.dragVelSmooth.x * 16e-5, -0.16, 0.16);
-        leanX += clamp2(this.dragVelSmooth.y * 1e-4, -0.12, 0.12);
-        bob += 0.05;
-        yawTarget += clamp2(this.dragVelSmooth.x * 0.02, -45, 45);
-      }
+      const pose = this.computePose(t, dt);
       if (this.jumpActive) {
         this.jumpVel -= 16 * dt;
         this.jumpOffset += this.jumpVel * dt;
@@ -28432,27 +28505,81 @@ void main() {
           this.jumpOffset = 0;
           this.jumpVel = 0;
           this.jumpActive = false;
+          this.sScaleY.kick(-1.9);
+          this.sBob.kick(-0.6);
         }
       }
+      let targetBob = pose.bob;
+      let targetLeanZ = pose.leanZ;
+      let targetLeanX = pose.leanX;
+      let targetScaleY = pose.scaleY;
+      let yawTarget = pose.yawTarget;
+      if (this.mood === "shy") {
+        yawTarget += 16;
+        targetLeanZ += Math.sin(t * 2.1) * 0.012;
+      } else if (this.mood === "happy") {
+        targetBob += Math.sin(t * 3.4) * 0.012 + 0.01;
+      } else if (this.mood === "sleepy") {
+        targetBob -= 0.03;
+        targetScaleY *= 0.985;
+        targetLeanZ += Math.sin(t * 0.7) * 0.02;
+      } else if (this.mood === "angry") {
+        targetLeanX += 0.02;
+      }
+      if (this.dragging) {
+        targetLeanZ += clamp2(-this.dragVelSmooth.x * 18e-5, -0.17, 0.17);
+        targetLeanX += clamp2(this.dragVelSmooth.y * 11e-5, -0.13, 0.13);
+        targetBob += 0.05;
+        yawTarget += clamp2(this.dragVelSmooth.x * 0.02, -45, 45);
+      }
       if (this.freezePose) {
-        bob = 0;
-        leanZ = 0;
-        leanX = 0;
-        scaleY = 1;
+        targetBob = 0;
+        targetLeanZ = 0;
+        targetLeanX = 0;
+        targetScaleY = 1;
+        this.sBob.reset(0);
+        this.sLeanZ.reset(0);
+        this.sLeanX.reset(0);
+        this.sScaleY.reset(1);
+      } else {
+        this.sBob.step(targetBob, dt);
+        this.sLeanZ.step(targetLeanZ, dt);
+        this.sLeanX.step(targetLeanX, dt);
+        this.sScaleY.step(targetScaleY, dt);
       }
       if (this.fixedYaw !== null && this.fixedYaw !== void 0) {
         this.yaw = this.fixedYaw;
+        this.yawVel = 0;
       } else {
-        this.yaw = damp2(this.yaw, clamp2(yawTarget, -180, 180), 5.5, dt);
+        const err = clamp2(yawTarget, -180, 180) - this.yaw;
+        this.anticipateCd = Math.max(0, this.anticipateCd - dt);
+        if (Math.abs(err) > 46 && this.anticipateCd <= 0) {
+          this.yawVel -= Math.sign(err) * 26;
+          this.anticipateCd = 0.55;
+        }
+        const k = this.activity === "lookAround" ? 34 : 46;
+        const acc = err * k - this.yawVel * 11;
+        this.yawVel += acc * dt;
+        this.yaw += this.yawVel * dt;
+        if (this.yaw > 180) {
+          this.yaw = 180;
+          this.yawVel = 0;
+        } else if (this.yaw < -180) {
+          this.yaw = -180;
+          this.yawVel = 0;
+        }
       }
-      this.root.position.y = this.baseRootY + bob + this.jumpOffset;
+      const leanZ = this.sLeanZ.value;
+      const groundLift = Math.sin(Math.min(Math.abs(leanZ), 0.4)) * (this.character.width || 4.35) * 0.5 * 0.62;
+      this.root.position.y = this.baseRootY + this.sBob.value + this.jumpOffset + groundLift;
       this.root.rotation.z = 0;
       this.root.rotation.x = 0;
-      const pivotScaleY = scaleY;
-      const pivotScaleX = 1 - (pivotScaleY - 1) * 0.45;
-      this.pivot.scale.set(pivotScaleX, pivotScaleY, 1);
+      const scaleY = clamp2(this.sScaleY.value, 0.8, 1.2);
+      const pivotScaleX = 1 - (scaleY - 1) * 0.45;
+      const turnSquash = clamp2(Math.abs(this.yawVel) / 190, 0, 1) * 0.075;
+      this.pivot.scale.set(pivotScaleX * (1 - turnSquash), scaleY, 1);
       this.pivot.rotation.z = leanZ;
-      this.pivot.rotation.x = leanX;
+      this.pivot.rotation.x = this.sLeanX.value;
       this.pivot.rotation.y = -MathUtils.degToRad(this.yaw) * 0.42;
       if (this.walkX !== void 0) {
         const targetX = this.walkX;
@@ -28461,24 +28588,168 @@ void main() {
       } else {
         this.root.position.x = damp2(this.root.position.x, this.baseRootX, 2.6, dt);
       }
-      const degAbs = (Math.round(this.yaw) % 360 + 360) % 360;
-      this.applyFacing(degAbs, 1);
-      this.updateExpression(dt);
+      this.applyFacing(dt);
+      this.updateExpression(dt, pose);
     }
-    /** 表情覆盖层：眨眼、闭眼、脸红；侧身后自动淡出。 */
-    updateExpression(dt) {
+    /** 计算当前动作的目标姿势（未过弹簧）。 */
+    computePose(t, dt) {
+      let bob = 0;
+      let leanZ = 0;
+      let leanX = 0;
+      let scaleY = 1;
+      let yawTarget = this.lookSmooth.x * 24;
+      let eyeClose = 0;
+      const u = this.activityDuration > 0 ? clamp2(this.activityTime / this.activityDuration, 0, 1) : 0;
+      switch (this.activity) {
+        case "walk":
+        case "peek": {
+          const speed = this.walkSpeed;
+          const cadence = 1.35 + speed * 0.075;
+          this.gait += dt * cadence * Math.PI * 2;
+          const g = this.gait;
+          const up = Math.sin(g);
+          bob = up * up * 0.052 - 0.014;
+          leanZ = Math.sin(g) * 0.03;
+          leanX = -0.046 - Math.sin(g * 2) * 7e-3;
+          scaleY = 1 + Math.cos(g * 2) * 0.013;
+          if (this.walkX !== void 0) {
+            const dir = Math.sign(this.walkX - this.root.position.x) || 1;
+            yawTarget = dir * 58;
+          }
+          break;
+        }
+        case "sit":
+          bob = -0.115;
+          scaleY = 0.915;
+          leanX = 0.032;
+          leanZ = Math.sin(t * 0.9) * 8e-3;
+          yawTarget = yawTarget * 0.6 + 5;
+          break;
+        case "sleep":
+          bob = -0.135 + Math.sin(t * 1.05) * 7e-3;
+          scaleY = 0.935 + Math.sin(t * 1.05) * 5e-3;
+          leanZ = Math.sin(t * 0.42) * 0.022;
+          leanX = 0.055 + Math.sin(t * 1.05) * 4e-3;
+          yawTarget = 8 + Math.sin(t * 0.25) * 5;
+          break;
+        case "doze":
+          bob = -0.075 + Math.sin(t * 1.2) * 6e-3;
+          scaleY = 0.962;
+          leanZ = Math.sin(t * 0.5) * 0.026;
+          leanX = 0.03;
+          yawTarget = 5;
+          break;
+        case "stretch": {
+          const k = sampleKeys(STRETCH_KEYS, u);
+          bob = k.bob;
+          scaleY = k.sy;
+          leanX = k.lx;
+          leanZ = k.lz;
+          if (u > 0.45 && u < 0.74) {
+            const tri = Math.sin(Math.PI * clamp2((u - 0.45) / 0.29, 0, 1));
+            leanZ += Math.sin(t * 26) * 4e-3 * tri;
+            bob += Math.sin(t * 21) * 25e-4 * tri;
+          }
+          yawTarget = Math.sin(t * 0.8) * 4;
+          break;
+        }
+        case "yawn": {
+          const k = sampleKeys(YAWN_KEYS, u);
+          bob = k.bob;
+          scaleY = k.sy;
+          leanX = k.lx;
+          leanZ = k.lz + (u > 0.3 && u < 0.72 ? Math.sin(t * 18) * 3e-3 : 0);
+          eyeClose = k.eye;
+          yawTarget = Math.sin(t * 0.7) * 3;
+          break;
+        }
+        case "tilt": {
+          const k = sampleKeys(TILT_KEYS, u);
+          bob = k.bob;
+          scaleY = k.sy;
+          leanX = k.lx;
+          leanZ = k.lz + Math.sin(t * 1.6) * 6e-3;
+          yawTarget = 10 + Math.sin(t * 1.1) * 5;
+          break;
+        }
+        case "cheer": {
+          const k = sampleKeys(CHEER_KEYS, u);
+          bob = k.bob;
+          scaleY = k.sy;
+          leanZ = k.lz;
+          leanX = k.lx;
+          yawTarget = 8 + Math.sin(t * 1.6) * 7;
+          break;
+        }
+        case "groom":
+          leanZ = Math.sin(t * 3.1) * 0.026 + 0.02;
+          leanX = 0.02 + Math.sin(t * 3.1) * 8e-3;
+          bob = -0.02;
+          yawTarget += 12 + Math.sin(t * 1.4) * 9;
+          break;
+        case "hop":
+          bob = Math.max(0, this.jumpOffset);
+          yawTarget = this.lookSmooth.x * 20;
+          break;
+        case "giggle":
+          bob = Math.abs(Math.sin(t * 8.2)) * 0.038;
+          leanZ = Math.sin(t * 5.6) * 0.045;
+          scaleY = 1 + Math.sin(t * 8.2) * 9e-3;
+          break;
+        case "shy":
+          bob = -0.035;
+          scaleY = 0.982;
+          yawTarget += 22;
+          leanZ = Math.sin(t * 1.9) * 0.018;
+          leanX = 0.02;
+          break;
+        case "nod": {
+          const cyc = u > 0 ? u : t % 1.2 / 1.2;
+          const drop = Math.sin(clamp2(cyc, 0, 1) * Math.PI);
+          leanX = drop * 0.075;
+          bob = -drop * 0.012;
+          break;
+        }
+        case "wave":
+        case "greet":
+          leanZ = Math.sin(t * 4.6) * 0.05;
+          yawTarget = 14 + Math.sin(t * 2.2) * 7;
+          bob = Math.abs(Math.sin(t * 4.6)) * 0.012;
+          break;
+        case "look":
+          yawTarget = this.lookSmooth.x * 34;
+          leanZ = Math.sin(t * 1.3) * 0.01;
+          break;
+        case "lookAround":
+          yawTarget = Math.sin(t * 0.72) * 36;
+          leanZ = Math.sin(t * 0.72) * 0.018;
+          leanX = Math.sin(t * 0.36) * 8e-3;
+          break;
+        default: {
+          const bp = t / 3.9 % 1;
+          const breathe = bp < 0.38 ? Math.sin(bp / 0.38 * Math.PI * 0.5) : Math.cos((bp - 0.38) / 0.62 * Math.PI * 0.5);
+          bob = breathe * 0.013 - 6e-3;
+          scaleY = 1 + breathe * 8e-3;
+          leanZ = Math.sin(t * 0.82) * 0.011;
+          leanX = this.lookSmooth.y * -0.016 + Math.sin(t * 0.53) * 5e-3;
+          break;
+        }
+      }
+      return { bob, leanZ, leanX, scaleY, yawTarget, eyeClose };
+    }
+    /** 表情覆盖层：眨眼 / 闭眼 / 脸红；闭眼贴片按朝向切换，侧身不再错用正脸。 */
+    updateExpression(dt, pose) {
       const expr = this.expression;
       if (!expr) return;
       const yawAbs = Math.abs(this.yaw);
-      const faceVisible = clamp2((86 - yawAbs) / 26, 0, 1);
       if (this.blinkPhase > 0) {
-        this.blinkPhase += dt / 0.17;
+        this.blinkPhase += dt / 0.13;
         if (this.blinkPhase >= 1) this.blinkPhase = 0;
       } else {
         this.blinkTimer -= dt;
         if (this.blinkTimer <= 0) {
-          this.blinkTimer = 2.4 + Math.random() * 4.2;
-          this.blinkPhase = 1e-4;
+          this.blinkTimer = this.noBlink ? 999 : 2.4 + Math.random() * 4.2;
+          this.blinkPhase = this.noBlink ? 0 : 1e-4;
         }
       }
       let blinkClose = 0;
@@ -28486,22 +28757,24 @@ void main() {
         blinkClose = this.blinkPhase < 0.5 ? this.blinkPhase / 0.5 : (1 - this.blinkPhase) / 0.5;
       }
       let sleepClose = 0;
-      if (this.activity === "sleep" || this.activity === "doze") sleepClose = 1;
-      else if (this.mood === "sleep" || this.mood === "sleepy") sleepClose = 0.78;
+      if (this.activity === "sleep") sleepClose = 1;
+      else if (this.activity === "doze") sleepClose = 0.92;
+      else if (this.mood === "sleep" || this.mood === "sleepy") sleepClose = 0.8;
       else if (this.reactTimer > 0 && this.reactPart === "face") sleepClose = 0;
-      const close = Math.max(blinkClose, sleepClose);
-      const lidOpacity = faceVisible * (close > 0.02 ? 1 : 0);
-      for (const lid of expr.lids) {
-        if (lidOpacity < 0.02) {
-          lid.visible = false;
+      const yawnClose = pose && pose.eyeClose ? pose.eyeClose : 0;
+      const close = Math.max(blinkClose, sleepClose, yawnClose);
+      const finalClose = this.debugClose === null || this.debugClose === void 0 ? close : this.debugClose;
+      for (const eye of expr.eyes) {
+        if (finalClose < 0.02) {
+          eye.visible = false;
           continue;
         }
-        lid.visible = true;
-        lid.material.opacity = lidOpacity;
-        lid.scale.y = Math.max(0.02, close);
+        eye.visible = true;
+        eye.material.opacity = clamp2(finalClose, 0, 1);
       }
       const wantBlush = this.mood === "shy" || this.mood === "happy" || this.activity === "shy" || this.activity === "giggle" || this.reactTimer > 0 && (this.reactPart === "face" || this.reactPart === "happy") ? 1 : 0;
       this.blushVal = damp2(this.blushVal, wantBlush, 5.5, dt);
+      const faceVisible = clamp2((58 - yawAbs) / 22, 0, 1);
       const blushOpacity = this.blushVal * faceVisible * 0.9;
       for (const cheek of expr.blushes) {
         if (blushOpacity < 0.02) {
@@ -28521,6 +28794,16 @@ void main() {
   function rand(min, max) {
     return min + Math.random() * (max - min);
   }
+  function pick(list) {
+    return list[Math.floor(Math.random() * list.length)];
+  }
+  var CHAT_PAIRS = [
+    { group: "yawn", action: "yawn", dur: 2.6 },
+    { group: "stretch", action: "stretch", dur: 2.8 },
+    { group: "tilt", action: "tilt", dur: 2 },
+    { group: "cheer", action: "cheer", dur: 1.9 },
+    { group: "groom", action: "groom", dur: 2.3 }
+  ];
   var Behavior = class {
     constructor(animator2, options = {}) {
       this.animator = animator2;
@@ -28644,7 +28927,15 @@ void main() {
       this.decide();
       if (elapsed2 - this.lastSpeak > 42 + Math.random() * 45) {
         this.lastSpeak = elapsed2;
-        if (this.current !== "sleep" && Math.random() < 0.6) this.onSpeak("idle");
+        if (this.current !== "sleep" && Math.random() < 0.6) {
+          if (this.current === "idle") {
+            const pair = pick(CHAT_PAIRS);
+            this.startActivity(pair.action, pair.dur);
+            this.onSpeak(pair.group);
+          } else {
+            this.onSpeak("idle");
+          }
+        }
       }
     }
     finishActivity() {
@@ -28664,7 +28955,12 @@ void main() {
       const veryTired = this.energy < 0.16;
       const nightSleepy = this.night && this.energy < 0.7;
       if (veryTired || nightSleepy && roll < 0.5) {
-        this.startActivity("sleep", rand(25, 55));
+        if (Math.random() < 0.55) {
+          this.startActivity("yawn", rand(2.6, 3));
+          this.onSpeak("yawn");
+        } else {
+          this.startActivity("sleep", rand(25, 55));
+        }
         return;
       }
       if (this.mouseActive && this.mouse.length() > 0.12 && roll < 0.34) {
@@ -28689,7 +28985,10 @@ void main() {
       const table = [
         { name: "wander", w: boredBoost ? 30 : 16, dur: [3, 5.5] },
         { name: "lookAround", w: 18, dur: [2.8, 4.2] },
-        { name: "stretch", w: 12, dur: [2.2, 2.8] },
+        { name: "stretch", w: 12, dur: [2.6, 3] },
+        { name: "yawn", w: tired ? 14 : 8, dur: [2.6, 3] },
+        { name: "tilt", w: 10, dur: [1.9, 2.4] },
+        { name: "cheer", w: 6, dur: [1.8, 2.2] },
         { name: "groom", w: 10, dur: [2, 2.6] },
         { name: "hop", w: 8, dur: [0.8, 1.2] },
         { name: "giggle", w: 8, dur: [1.2, 1.8] },
@@ -28713,7 +29012,11 @@ void main() {
       }
       const duration = rand(chosen.dur[0], chosen.dur[1]);
       this.startActivity(chosen.name, duration);
-      if (chosen.name === "stretch" && Math.random() < 0.35) this.onSpeak("idle");
+      if (chosen.name === "stretch" && Math.random() < 0.5) this.onSpeak("stretch");
+      if (chosen.name === "yawn" && Math.random() < 0.6) this.onSpeak("yawn");
+      if (chosen.name === "tilt" && Math.random() < 0.4) this.onSpeak("tilt");
+      if (chosen.name === "cheer" && Math.random() < 0.5) this.onSpeak("cheer");
+      if (chosen.name === "groom" && Math.random() < 0.35) this.onSpeak("groom");
       if (chosen.name === "giggle" && Math.random() < 0.3) this.onSpeak("idle");
       if (chosen.name === "sit" && Math.random() < 0.25) this.onSpeak("sit");
     }
@@ -28741,7 +29044,12 @@ void main() {
     drag: ["\u54C7\u2014\u2014\u8981\u6389\u4E0B\u53BB\u4E86\uFF01", "\u8F7B\u4E00\u70B9\u3001\u8F7B\u4E00\u70B9\uFF01", "\u8981\u5E26\u6211\u53BB\u54EA\u91CC\u5440\uFF1F"],
     idle: ["\u4ECA\u5929\u5929\u6C14\u4E0D\u9519\u5462\u3002", "\u8981\u4E0D\u8981\u4E00\u8D77\u8DD1\u4E00\u4F1A\u513F\uFF1F", "\u6709\u70B9\u60F3\u5403\u80E1\u841D\u535C\u2026", "\u8BAD\u7EC3\u5458\uFF0C\u52A0\u6CB9\u54E6\uFF01"],
     sit: ["\u5750\u592A\u4E45\u5566\uFF0C\u7AD9\u8D77\u6765\u6D3B\u52A8\u4E00\u4E0B\u5427\u3002", "\u80A9\u8180\u4F1A\u4E0D\u4F1A\u9178\uFF1F\u62C9\u4F38\u4E00\u4E0B\uFF5E"],
-    sleep: ["\u547C\u2026\u597D\u56F0\u2026\u5148\u7761\u4E00\u4F1A\u513F\u3002"]
+    sleep: ["\u547C\u2026\u597D\u56F0\u2026\u5148\u7761\u4E00\u4F1A\u513F\u3002"],
+    stretch: ["\u5514\u2014\u2014\u4F38\u4E2A\u61D2\u8170\uFF5E", "\u5750\u4E45\u4E86\u8170\u4F1A\u9178\u7684\u561B\u3002", "\u554A\u2026\u80A9\u8180\u7EC8\u4E8E\u677E\u5F00\u4E86\u3002", "\u8FD9\u6837\u62C9\u4F38\u4E00\u4E0B\u6700\u8212\u670D\u4E86\u3002"],
+    yawn: ["\u547C\u554A\u2014\u2014\u2026\u597D\u56F0\u3002", "\u5514\u2026\u6709\u70B9\u60F3\u7761\u4E86\u5462\u3002", "\u554A\u2014\u2014\u6B20\u2026\u62B1\u6B49\uFF0C\u6CA1\u5FCD\u4F4F\u3002", "\u773C\u76AE\u6709\u70B9\u91CD\u4E86\u2026"],
+    cheer: ["\u8BAD\u7EC3\u5458\uFF0C\u52A0\u6CB9\uFF01", "\u4E00\u8D77\u8DD1\u8D77\u6765\u5427\uFF01", "\u4ECA\u5929\u72B6\u6001\u8D85\u597D\uFF01", "\u563F\uFF01\u770B\u6211\u7684\uFF01"],
+    tilt: ["\u55EF\uFF1F\u600E\u4E48\u4E86\uFF1F", "\u5728\u770B\u6211\u5417\uFF1F", "\u8BAD\u7EC3\u5458\u5728\u60F3\u4EC0\u4E48\u5462\uFF1F", "\u6709\u70B9\u597D\u5947\u2026"],
+    groom: ["\u8033\u6735\u6709\u70B9\u4E71\u4E86\u5462\u3002", "\u6574\u7406\u4E00\u4E0B\u6BDB\u53D1\uFF5E", "\u9A6C\u5C3E\u8981\u68B3\u987A\u624D\u884C\u3002"]
   };
   var bubbleEl = document.getElementById("bubble");
   var affEl = document.getElementById("affection");
@@ -28749,7 +29057,7 @@ void main() {
   var affFillEl = document.getElementById("affFill");
   var bubbleTimer = null;
   var affection = 0;
-  function pick(list) {
+  function pick2(list) {
     return list[Math.floor(Math.random() * list.length)];
   }
   function showBubble(text, duration = 2600) {
@@ -28765,7 +29073,7 @@ void main() {
   function randomLine(group) {
     const list = Array.isArray(group) ? group : LINES[group];
     if (!list || !list.length) return "";
-    return pick(list);
+    return pick2(list);
   }
   function say(group, duration = 2600) {
     const text = randomLine(group);
@@ -29062,8 +29370,13 @@ void main() {
         break;
     }
     if (before < 25 && after >= 25) showBubble("\u6211\u4EEC\u2026\u597D\u50CF\u719F\u6089\u4E00\u70B9\u4E86\uFF1F", 3e3);
-    else if (before < 55 && after >= 55) showBubble("\u5F00\u59CB\u6709\u70B9\u4EB2\u8FD1\u4E86\u5462\u3002", 3e3);
-    else if (before < 80 && after >= 80) showBubble("\u8BAD\u7EC3\u5458\u662F\u6211\u6700\u4FE1\u8D56\u7684\u4EBA\uFF01", 3200);
+    else if (before < 55 && after >= 55) {
+      showBubble("\u5F00\u59CB\u6709\u70B9\u4EB2\u8FD1\u4E86\u5462\u3002", 3e3);
+      animator.play("cheer", 2);
+    } else if (before < 80 && after >= 80) {
+      showBubble("\u8BAD\u7EC3\u5458\u662F\u6211\u6700\u4FE1\u8D56\u7684\u4EBA\uFF01", 3200);
+      animator.play("cheer", 2);
+    }
   }
   canvas.addEventListener("pointerup", endDrag);
   window.addEventListener("pointerup", endDrag);
@@ -29100,8 +29413,10 @@ void main() {
     const hour = (/* @__PURE__ */ new Date()).getHours();
     if (hour >= 23 || hour < 7) {
       showBubble("\u8FD9\u4E48\u665A\u8FD8\u5728\u5FD9\u2026\u8981\u6CE8\u610F\u4F11\u606F\u54E6\u3002", 3800);
+      animator.play("yawn", 2.6);
       animator.setMood("sleepy", 2.2);
     } else {
+      animator.play("wave", 2);
       say("greeting", 3400);
     }
   }, 2200);

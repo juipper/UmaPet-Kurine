@@ -22,13 +22,21 @@ jobs:
 
       - name: Install deps
         run: npm ci
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+
+      - name: Ensure electron binary
+        run: node node_modules/electron/install.js
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
 
       - name: Build renderer
         run: npm run build:renderer
 
       - name: Build portable exe
-        run: npx electron-builder --win portable --publish never --config.electronDist=node_modules/electron/dist
+        run: npx electron-builder --win portable --publish never
         env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
           ELECTRON_BUILDER_BINARIES_MIRROR: https://registry.npmmirror.com/-/binary/electron-builder-binaries/
 
       - uses: actions/upload-artifact@v4
@@ -43,4 +51,5 @@ jobs:
         with:
           files: release/*.exe
           fail_on_unmatched_files: false
+          overwrite_files: true
           draft: false

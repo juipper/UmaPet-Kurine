@@ -10,9 +10,11 @@ import * as THREE from 'three';
  * 命中判定沿用 raycast 命中的 UV 坐标反推部位，点击反馈完整保留。
  */
 
-export const SPRITE_ASPECT = 1060 / 1120; // 贴图画布宽高比
-export const SPRITE_BODY_TOP = 1 - 64 / 1120; // 角色头顶在贴图中的 v
-export const SPRITE_BODY_BOTTOM = 1 - 1063 / 1120; // 角色脚底在贴图中的 v
+// 贴图已裁到角色本体（马耳顶端到长靴，仅留 2px 羽化余量），画布 1060x1120 -> 617x970。
+// 下列常量全部按新画布换算，改图时须同步（见 tools/sprite_crop.json）。
+export const SPRITE_ASPECT = 617 / 970; // 贴图画布宽高比
+export const SPRITE_BODY_TOP = 1 - 4 / 970; // 角色头顶（马耳）在贴图中的 v
+export const SPRITE_BODY_BOTTOM = 1 - 966 / 970; // 角色脚底（长靴底）在贴图中的 v
 
 const BODY_SRC = '../../assets/sprites/deg_000.png';
 const EYE_SRC = '../../assets/sprites/blink/deg_000_eye.png';
@@ -35,12 +37,12 @@ export function partFromUV(u, v) {
   return 'leg';
 }
 
-/** 表情覆盖层：脸红（位置按正面贴图标注）。 */
-const BLUSH_PX = [{ x: 472, y: 632 }, { x: 726, y: 626 }];
+/** 表情覆盖层：脸红（位置按正面贴图标注，已随贴图同比减去裁切偏移 x-320 / y-61）。 */
+const BLUSH_PX = [{ x: 152, y: 571 }, { x: 406, y: 565 }];
 const BLUSH_W_PX = 152;
 const BLUSH_H_PX = 84;
-const SPRITE_CW = 1060;
-const SPRITE_CH = 1120;
+const SPRITE_CW = 617;
+const SPRITE_CH = 970;
 
 function canvasTexture(size, draw) {
   const canvas = document.createElement('canvas');

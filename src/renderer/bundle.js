@@ -27592,9 +27592,9 @@ void main() {
   };
 
   // src/renderer/js/spritechar.js
-  var SPRITE_ASPECT = 1060 / 1120;
-  var SPRITE_BODY_TOP = 1 - 64 / 1120;
-  var SPRITE_BODY_BOTTOM = 1 - 1063 / 1120;
+  var SPRITE_ASPECT = 617 / 970;
+  var SPRITE_BODY_TOP = 1 - 4 / 970;
+  var SPRITE_BODY_BOTTOM = 1 - 966 / 970;
   var BODY_SRC = "../../assets/sprites/deg_000.png";
   var EYE_SRC = "../../assets/sprites/blink/deg_000_eye.png";
   function partFromUV(u, v) {
@@ -27612,11 +27612,11 @@ void main() {
     if (t > 0.26) return "skirt";
     return "leg";
   }
-  var BLUSH_PX = [{ x: 472, y: 632 }, { x: 726, y: 626 }];
+  var BLUSH_PX = [{ x: 152, y: 571 }, { x: 406, y: 565 }];
   var BLUSH_W_PX = 152;
   var BLUSH_H_PX = 84;
-  var SPRITE_CW = 1060;
-  var SPRITE_CH = 1120;
+  var SPRITE_CW = 617;
+  var SPRITE_CH = 970;
   function canvasTexture(size, draw) {
     const canvas2 = document.createElement("canvas");
     canvas2.width = size;

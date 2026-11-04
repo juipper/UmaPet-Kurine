@@ -36,6 +36,7 @@
       "assets/sprites/deg_225.png",
       "assets/sprites/deg_270.png",
       "assets/sprites/deg_315.png",
+      "assets/sprites/blink/**",
       "package.json",
       "!electron_runtime/**",
       "!release/**",

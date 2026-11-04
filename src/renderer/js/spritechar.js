@@ -10,10 +10,10 @@ import * as THREE from 'three';
  * 命中判定沿用 raycast 命中的 UV 坐标反推部位，点击反馈完整保留。
  */
 
-// 贴图已裁到角色本体（马耳顶端到长靴，仅留 2px 羽化余量），画布 1060x1120 -> 617x970。
+// 贴图已裁到角色本体（马耳顶端到长靴，保留原始 alpha，不做连通域过滤），画布 1060x1120 -> 617x970。
 // 下列常量全部按新画布换算，改图时须同步（见 tools/sprite_crop.json）。
 export const SPRITE_ASPECT = 617 / 970; // 贴图画布宽高比
-export const SPRITE_BODY_TOP = 1 - 4 / 970; // 角色头顶（马耳）在贴图中的 v
+export const SPRITE_BODY_TOP = 1 - 3 / 970; // 角色头顶（马耳）在贴图中的 v
 export const SPRITE_BODY_BOTTOM = 1 - 966 / 970; // 角色脚底（长靴底）在贴图中的 v
 
 const BODY_SRC = '../../assets/sprites/deg_000.png';
@@ -181,11 +181,6 @@ export function buildSpriteCharacter() {
     body,
     eye,
     expression: { eye, blushes: expression.blushes },
-    bodyTexture,
-    eyeTexture,
-    width,
-    height,
-    footY,
-    planeY
+    width
   };
 }

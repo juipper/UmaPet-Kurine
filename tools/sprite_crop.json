@@ -1,18 +1,17 @@
 {
   "说明": "deg_000.png 与 blink/deg_000_eye.png 的裁切变换清单。改图/重裁时按此同步 spritechar.js 常量。",
-  "生成脚本": "temp/clean_sprite.py + temp/apply_assets.py",
+  "生成脚本": "temp/rebuild_sprite.py（v2.3.2 起：仅 bbox 裁切 + 弱毛边清理 + 色溢填充，禁止任何连通域/开闭运算过滤，否则会吃掉左腿）",
   "原画布": { "w": 1060, "h": 1120 },
   "裁切框": { "left": 320, "top": 61, "right": 936, "bottom": 1030, "w": 617, "h": 970 },
   "清理内容": [
     "左下角黄色文字「计划」（原图 x41-238 / y1036-1064）及其模糊水印",
     "alpha<10 的极弱毛边与四周不规则留白",
-    "连通域 3x3 开闭运算去掉的边缘锯齿碎片",
     "边缘半透明像素改用最近不透明像素颜色（色溢填充），消除白边/灰边/紫色描边"
   ],
-  "主体范围_裁切后": { "top_row": 4, "bottom_row": 966, "left_col": 4, "right_col": 613, "判定阈值": "alpha>=128" },
+  "主体范围_裁切后": { "top_row": 3, "bottom_row": 966, "left_col": 4, "right_col": 613, "判定阈值": "alpha>=128" },
   "spritechar常量": {
     "SPRITE_ASPECT": "617 / 970",
-    "SPRITE_BODY_TOP": "1 - 4 / 970",
+    "SPRITE_BODY_TOP": "1 - 3 / 970",
     "SPRITE_BODY_BOTTOM": "1 - 966 / 970",
     "BLUSH_PX": [{ "x": 152, "y": 571 }, { "x": 406, "y": 565 }],
     "BLUSH_W_PX": 152,

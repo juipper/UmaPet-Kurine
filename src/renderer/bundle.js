@@ -27593,7 +27593,7 @@ void main() {
 
   // src/renderer/js/spritechar.js
   var SPRITE_ASPECT = 617 / 970;
-  var SPRITE_BODY_TOP = 1 - 4 / 970;
+  var SPRITE_BODY_TOP = 1 - 3 / 970;
   var SPRITE_BODY_BOTTOM = 1 - 966 / 970;
   var BODY_SRC = "../../assets/sprites/deg_000.png";
   var EYE_SRC = "../../assets/sprites/blink/deg_000_eye.png";
@@ -27736,12 +27736,7 @@ void main() {
       body,
       eye,
       expression: { eye, blushes: expression.blushes },
-      bodyTexture,
-      eyeTexture,
-      width,
-      height,
-      footY,
-      planeY
+      width
     };
   }
 

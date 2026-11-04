@@ -27,7 +27,7 @@ jobs:
         run: npm run build:renderer
 
       - name: Build portable exe
-        run: npx electron-builder --win portable -c.electronDist=node_modules/electron/dist
+        run: npx electron-builder --win portable --publish never --config.electronDist=node_modules/electron/dist
         env:
           ELECTRON_BUILDER_BINARIES_MIRROR: https://registry.npmmirror.com/-/binary/electron-builder-binaries/
 

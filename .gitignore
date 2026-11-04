@@ -36,11 +36,3 @@ desktop.ini
 *.bak
 *_2.js
 *_20*.js
-
-# legacy Python 版构建产物
-/legacy/build/
-/legacy/dist/
-/legacy/release/
-/legacy/build_installer_artifacts/
-/legacy/__pycache__/
-/legacy/temp/

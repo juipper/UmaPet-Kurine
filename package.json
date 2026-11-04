@@ -2,7 +2,7 @@
   "name": "umapet",
   "productName": "赛马娘桌宠",
   "version": "2.3.2",
-  "description": "赛马娘桌宠 · 正面本体贴图版 · 形象已清理（Electron + three.js）",
+  "description": "赛马娘桌宠 · 正面视角贴图版 · 原画重裁双腿完整（Electron + three.js）",
   "main": "src/main/main.js",
   "author": "juipper",
   "license": "MIT",
@@ -33,7 +33,7 @@
       "!electron_runtime/**",
       "!release/**",
       "!tools/**",
-      "!legacy/**",
+      
       "!*.log"
     ],
     "directories": {

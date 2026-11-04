@@ -1,4 +1,4 @@
-name: Build Releases
+name: Build Portable
 
 on:
   push:
@@ -14,46 +14,33 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.11"
+          node-version: "20"
+          cache: npm
+
       - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-      - name: Build Windows installer
-        run: python scripts/build_windows.py
+        run: npm ci
+
+      - name: Build renderer
+        run: npm run build:renderer
+
+      - name: Build portable exe
+        run: npx electron-builder --win portable -c.electronDist=node_modules/electron/dist
+        env:
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://registry.npmmirror.com/-/binary/electron-builder-binaries/
+
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-installer
-          path: release/*
+          name: UmaPet-Portable
+          path: release/*.exe
+          if-no-files-found: error
 
-  macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Build macOS dmg
-        run: bash scripts/build_macos.sh
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-dmg
-          path: release/*.dmg
-
-  release:
-    needs: [windows, macos]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
       - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/windows-installer/*
-            artifacts/macos-dmg/*
+          files: release/*.exe
           fail_on_unmatched_files: false
           draft: false
